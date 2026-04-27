@@ -9,16 +9,21 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+
 // ==============================
-// 🔐 DATABASE CONFIG (HARDCODED)
+// ✅ SUPABASE DATABASE (FIXED)
 // ==============================
 const pool = new Pool({
   user: "postgres.ufbttlxvzuchacptqkee",
   host: "aws-1-ap-south-1.pooler.supabase.com",
   database: "postgres",
-  password: "1lqW1fYbCxK4jgr9",   // 👉 change this
+  password: "1lqW1fYbCxK4jgr9",
   port: 5432,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
+
 
 // ==============================
 // ✅ TEST ROUTE
@@ -29,7 +34,7 @@ app.get("/", (req, res) => {
 
 
 // =====================================================
-// ✅ CREATE USER (FROM GOOGLE FORM)
+// ✅ CREATE USER
 // =====================================================
 app.post("/create", async (req, res) => {
   try {
@@ -52,10 +57,8 @@ app.post("/create", async (req, res) => {
 
     console.log("📩 Incoming Data:", req.body);
 
-    // 🔐 Generate Unique ID
     const id = uuidv4();
 
-    // 💾 Insert into DB
     await pool.query(
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
@@ -72,13 +75,10 @@ app.post("/create", async (req, res) => {
       ]
     );
 
-    // 🔗 URL for QR
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // 📷 Generate QR Code
     const qr = await QRCode.toDataURL(url);
 
-    // 📊 Generate Barcode
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
@@ -86,25 +86,23 @@ app.post("/create", async (req, res) => {
       height: 10,
     });
 
-    const barcode = barcodeBuffer.toString("base64");
-
     res.json({
       success: true,
       id,
       url,
       qr,
-      barcode
+      barcode: barcodeBuffer.toString("base64")
     });
 
   } catch (err) {
     console.error("❌ ERROR:", err);
-    res.status(500).json({ error: "Server Error" });
+    res.status(500).json({ error: err.message });
   }
 });
 
 
 // =====================================================
-// ✅ USER PAGE (QR SCAN RESULT)
+// ✅ USER PAGE
 // =====================================================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -138,29 +136,10 @@ app.get("/user/:id", async (req, res) => {
 
 
 // =====================================================
-// ✅ BARCODE API
+// 🚀 START SERVER (FIXED FOR RENDER)
 // =====================================================
-app.get("/barcode/:id", async (req, res) => {
-  try {
-    const png = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: req.params.id,
-      scale: 3,
-      height: 10,
-    });
+const PORT = process.env.PORT || 3000;
 
-    res.set("Content-Type", "image/png");
-    res.send(png);
-
-  } catch (err) {
-    res.status(500).send("Error generating barcode");
-  }
-});
-
-
-// ==============================
-// 🚀 START SERVER
-// ==============================
-app.listen(3000, () => {
-  console.log("🚀 Server running on http://localhost:3000");
+app.listen(PORT, () => {
+  console.log("🚀 Server running on port " + PORT);
 });
