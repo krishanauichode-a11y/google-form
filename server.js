@@ -73,7 +73,7 @@ app.post("/create", async (req, res) => {
     );
 
     // 🔗 URL for QR
-    const url = `http://localhost:3000/user/${id}`;
+    const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
     // 📷 Generate QR Code
     const qr = await QRCode.toDataURL(url);
