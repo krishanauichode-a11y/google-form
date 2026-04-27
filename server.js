@@ -75,13 +75,13 @@ app.post("/create", async (req, res) => {
     // Generate QR Code
     const qr = await QRCode.toDataURL(url);
 
-    // Generate Barcode (smaller and scannable)
+    // Generate Barcode (Code39, shorter ID, larger size)
     const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128", // Use Code128 for better scanning
-      text: id.substring(0, 12), // Truncate ID to 12 chars for smaller barcode
-      scale: 2, // Reduce scale for smaller size
-      height: 5, // Reduce height
-      includetext: false, // Remove text below barcode
+      bcid: "code39", // Simpler format
+      text: id.substring(0, 8), // First 8 chars (e.g., "a1b2c3d4")
+      scale: 3, // Slightly larger
+      height: 8, // Taller for better scanning
+      includetext: true, // Show text below (optional)
       textxalign: "center",
     });
 
