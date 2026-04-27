@@ -140,7 +140,7 @@ app.post("/share-interakt", async (req, res) => {
       body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your QR Code:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your QR URL
+        mediaUrl: `https://google-form-kebh.onrender.com/${uuidv4()}` // Replace with your QR URL
       })
     });
 
@@ -154,7 +154,7 @@ app.post("/share-interakt", async (req, res) => {
       body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your Barcode:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your barcode URL
+        mediaUrl: `https://google-form-kebh.onrender.com/${uuidv4()}` // Replace with your barcode URL
       })
     });
 
