@@ -4,6 +4,8 @@ const QRCode = require("qrcode");
 const bwipjs = require("bwip-js");
 const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 app.use(express.json());
@@ -77,24 +79,97 @@ app.post("/create", async (req, res) => {
 
     // Generate Barcode (smaller and scannable)
     const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128", // Use Code128 for better scanning
-      text: id.substring(0, 12), // Truncate ID to 12 chars for smaller barcode
-      scale: 2, // Reduce scale for smaller size
-      height: 5, // Reduce height
-      includetext: false, // Remove text below barcode
+      bcid: "code128",
+      text: id.substring(0, 12),
+      scale: 2,
+      height: 5,
+      includetext: false,
       textxalign: "center",
     });
+
+    // Save QR and Barcode to temporary files
+    const qrPath = path.join(__dirname, "temp", `${id}-qr.png`);
+    const barcodePath = path.join(__dirname, "temp", `${id}-barcode.png`);
+
+    // Ensure temp directory exists
+    if (!fs.existsSync(path.join(__dirname, "temp"))) {
+      fs.mkdirSync(path.join(__dirname, "temp"));
+    }
+
+    // Save files
+    fs.writeFileSync(qrPath, qr.split(",")[1], "base64");
+    fs.writeFileSync(barcodePath, barcodeBuffer, "base64");
 
     res.json({
       success: true,
       id,
       url,
       qr,
-      barcode: barcodeBuffer.toString("base64")
+      barcode: barcodeBuffer.toString("base64"),
+      qrPath,
+      barcodePath
     });
 
   } catch (err) {
     console.error("❌ ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================
+// ✅ SHARE VIA INTERAKT
+// ==============================
+app.post("/share-interakt", async (req, res) => {
+  try {
+    const { phone, qrPath, barcodePath } = req.body;
+
+    // Convert phone to international format
+    const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
+
+    // Interakt API Configuration (replace with your actual credentials)
+    const interaktApiUrl = "https://api.interakt.io/v1";
+    const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
+
+    // Send QR Code
+    const qrResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${interaktApiKey}`
+      },
+      body: JSON.stringify({
+        phoneNumber: interaktNumber,
+        message: "Your QR Code:",
+        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your QR URL
+      })
+    });
+
+    // Send Barcode
+    const barcodeResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${interaktApiKey}`
+      },
+      body: JSON.stringify({
+        phoneNumber: interaktNumber,
+        message: "Your Barcode:",
+        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your barcode URL
+      })
+    });
+
+    // Log results
+    console.log("📱 QR Sent:", qrResponse.ok);
+    console.log("📱 Barcode Sent:", barcodeResponse.ok);
+
+    res.json({
+      success: true,
+      qrSent: qrResponse.ok,
+      barcodeSent: barcodeResponse.ok
+    });
+
+  } catch (err) {
+    console.error("❌ Interakt Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
