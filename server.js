@@ -9,7 +9,6 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-
 // ==============================
 // ✅ SUPABASE DATABASE (FIXED)
 // ==============================
@@ -19,11 +18,8 @@ const pool = new Pool({
   database: "postgres",
   password: "1lqW1fYbCxK4jgr9",
   port: 5432,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 });
-
 
 // ==============================
 // ✅ TEST ROUTE
@@ -32,10 +28,9 @@ app.get("/", (req, res) => {
   res.send("✅ Server Running");
 });
 
-
-// =====================================================
-// ✅ CREATE USER
-// =====================================================
+// ==============================
+// ✅ CREATE USER (WITH QR & BARCODE)
+// ==============================
 app.post("/create", async (req, res) => {
   try {
     const {
@@ -77,8 +72,10 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
+    // Generate QR Code
     const qr = await QRCode.toDataURL(url);
 
+    // Generate Barcode
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
@@ -100,16 +97,15 @@ app.post("/create", async (req, res) => {
   }
 });
 
-
-// =====================================================
-// ✅ USER PAGE
-// =====================================================
+// ==============================
+// ✅ USER PAGE (DISPLAYS USER DETAILS)
+// ==============================
 app.get("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
     const result = await pool.query(
-      "SELECT full_name, trading_type FROM users WHERE id=$1",
+      "SELECT * FROM users WHERE id=$1",
       [id]
     );
 
@@ -120,11 +116,23 @@ app.get("/user/:id", async (req, res) => {
     const user = result.rows[0];
 
     res.send(`
-      <div style="text-align:center; font-family:sans-serif;">
+      <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
         <h2>✅ Verified Student</h2>
         <p><strong>Name:</strong> ${user.full_name}</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Phone:</strong> ${user.phone}</p>
+        <p><strong>Address:</strong> ${user.address}</p>
+        <p><strong>Date of Birth:</strong> ${user.dob}</p>
+        <p><strong>Trading Market:</strong> ${user.trading_market}</p>
         <p><strong>Trading Type:</strong> ${user.trading_type}</p>
-        <p><strong>Status:</strong> Active</p>
+        <p><strong>Source:</strong> ${user.source}</p>
+        <p><strong>Software Used:</strong> ${user.software_used}</p>
+        <p><strong>Previous Course:</strong> ${user.previous_course}</p>
+        <p><strong>Level:</strong> ${user.level}</p>
+        <p><strong>Amount Paid:</strong> ${user.amount}</p>
+        <p><strong>Payment Mode:</strong> ${user.payment_mode}</p>
+        <hr>
+        <p><small>Scan this QR/Barcode again to reload</small></p>
       </div>
     `);
 
@@ -134,12 +142,10 @@ app.get("/user/:id", async (req, res) => {
   }
 });
 
-
-// =====================================================
+// ==============================
 // 🚀 START SERVER (FIXED FOR RENDER)
-// =====================================================
+// ==============================
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
 });
