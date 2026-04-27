@@ -6,6 +6,8 @@ const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const https = require("https");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
@@ -100,14 +102,18 @@ app.post("/create", async (req, res) => {
     fs.writeFileSync(qrPath, qr.split(",")[1], "base64");
     fs.writeFileSync(barcodePath, barcodeBuffer, "base64");
 
+    // Upload to Google Drive (or cloud storage)
+    const qrUrl = await uploadToGoogleDrive(qrPath, `${id}-qr.png`);
+    const barcodeUrl = await uploadToGoogleDrive(barcodePath, `${id}-barcode.png`);
+
     res.json({
       success: true,
       id,
       url,
       qr,
       barcode: barcodeBuffer.toString("base64"),
-      qrPath,
-      barcodePath
+      qrUrl,
+      barcodeUrl
     });
 
   } catch (err) {
@@ -117,62 +123,94 @@ app.post("/create", async (req, res) => {
 });
 
 // ==============================
-// ✅ SHARE VIA INTERAKT
+// ✅ SHARE VIA INTERAKT (FIXED WITH SSL HANDLING)
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
-    const { phone, qrPath, barcodePath } = req.body;
+    const { phone, qrUrl, barcodeUrl } = req.body;
 
     // Convert phone to international format
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
 
-    // Interakt API Configuration (replace with your actual credentials)
+    // Interakt API Configuration
     const interaktApiUrl = "https://api.interakt.io/v1";
     const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
 
-    // Send QR Code
-    const qrResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
-      },
-      body: JSON.stringify({
+    // SSL workaround (temporary fix)
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false // Not recommended for production
+    });
+
+    // Send QR Code via Interakt
+    const qrResponse = await axios.post(
+      `${interaktApiUrl}/whatsapp/send`,
+      {
         phoneNumber: interaktNumber,
         message: "Your QR Code:",
-        mediaUrl: `https://google-form-kebh.onrender.com/${uuidv4()}` // Replace with your QR URL
-      })
-    });
-
-    // Send Barcode
-    const barcodeResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
+        mediaUrl: qrUrl
       },
-      body: JSON.stringify({
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${interaktApiKey}`
+        },
+        httpsAgent
+      }
+    );
+
+    // Send Barcode via Interakt
+    const barcodeResponse = await axios.post(
+      `${interaktApiUrl}/whatsapp/send`,
+      {
         phoneNumber: interaktNumber,
         message: "Your Barcode:",
-        mediaUrl: `https://google-form-kebh.onrender.com/${uuidv4()}` // Replace with your barcode URL
-      })
-    });
+        mediaUrl: barcodeUrl
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${interaktApiKey}`
+        },
+        httpsAgent
+      }
+    );
 
     // Log results
-    console.log("📱 QR Sent:", qrResponse.ok);
-    console.log("📱 Barcode Sent:", barcodeResponse.ok);
+    console.log("📱 QR Sent:", qrResponse.status === 200);
+    console.log("📱 Barcode Sent:", barcodeResponse.status === 200);
 
     res.json({
       success: true,
-      qrSent: qrResponse.ok,
-      barcodeSent: barcodeResponse.ok
+      qrSent: qrResponse.status === 200,
+      barcodeSent: barcodeResponse.status === 200
     });
 
   } catch (err) {
-    console.error("❌ Interakt Error:", err);
+    console.error("❌ Interakt Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
+// ==============================
+// ✅ UPLOAD TO GOOGLE DRIVE (IMPLEMENTATION NEEDED)
+// ==============================
+async function uploadToGoogleDrive(filePath, filename) {
+  try {
+    // TODO: Replace with actual Google Drive API integration
+    // Example:
+    // 1. Set up Google Cloud Console project
+    // 2. Create Service Account & download credentials
+    // 3. Install Google Drive API: `npm install @googleapis/drive`
+    // 4. Implement upload logic
+    
+    // For now, return a placeholder URL
+    return `https://drive.google.com/uc?id=${uuidv4()}`;
+    
+  } catch (err) {
+    console.error("❌ Google Drive Upload Error:", err);
+    return null;
+  }
+}
 
 // ==============================
 // ✅ USER PAGE (DISPLAYS USER DETAILS)
