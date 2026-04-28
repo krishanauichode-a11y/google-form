@@ -11,19 +11,24 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Database connection
+// Render database configuration
 const pool = new Pool({
-  user: "postgres.ufbttlxvzuchacptqkee",
-  host: "aws-1-ap-south-1.pooler.supabase.com",
-  database: "postgres",
-  password: "1lqW1fYbCxK4jgr9",
-  port: 5432,
+  user: process.env.DB_USER || "postgres.ufbttlxvzuchacptqkee",
+  host: process.env.DB_HOST || "aws-1-ap-south-1.pooler.supabase.com",
+  database: process.env.DB_NAME || "postgres",
+  password: process.env.DB_PASSWORD || "1lqW1fYbCxK4jgr9",
+  port: process.env.DB_PORT || 5432,
   ssl: { rejectUnauthorized: false }
 });
 
 // Test route
 app.get("/", (req, res) => {
   res.send("✅ Server Running");
+});
+
+// Health check for Render
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
 // Create user with QR/Barcode
@@ -49,7 +54,7 @@ app.post("/create", async (req, res) => {
     );
 
     // Generate QR and Barcode
-    const url = `https://google-form-kebh.onrender.com/user/${id}`;
+    const url = `${process.env.APP_URL || "https://google-form-kebh.onrender.com"}/user/${id}`;
     const qr = await QRCode.toDataURL(url);
     
     const barcodeBuffer = await bwipjs.toBuffer({
@@ -66,12 +71,19 @@ app.post("/create", async (req, res) => {
     const qrPath = saveTempFile(id, "qr", qr);
     const barcodePath = saveTempFile(id, "barcode", barcodeBuffer);
 
+    // Construct public URLs
+    const baseUrl = process.env.APP_URL || "https://google-form-kebh.onrender.com";
+    const qrUrl = `${baseUrl}/media/${id}/qr`;
+    const barcodeUrl = `${baseUrl}/media/${id}/barcode`;
+
     res.json({
       success: true,
       id,
       url,
       qr,
       barcode: barcodeBuffer.toString("base64"),
+      qrUrl,
+      barcodeUrl,
       qrPath,
       barcodePath
     });
@@ -165,7 +177,7 @@ app.get("/media/:id/:type", (req, res) => {
 function ensureTempDir() {
   const tempDir = path.join(__dirname, "temp");
   if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir);
+    fs.mkdirSync(tempDir, { recursive: true });
   }
 }
 
@@ -220,8 +232,8 @@ async function sendDirectMedia(phone, mediaUrl, mediaType) {
   }
 }
 
-// Start server
+// Start server - FIXED SYNTAX
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, => {
+app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
 });
