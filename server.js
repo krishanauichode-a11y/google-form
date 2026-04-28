@@ -127,26 +127,25 @@ app.post("/create", async (req, res) => {
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
-    const { phone, qrUrl, barcodeUrl } = req.body;
+    const { phone, qrBase64, barcodeBase64 } = req.body;
 
-    // Convert phone to international format
+    console.log("🔍 Interakt Request:", { phone, qrBase64, barcodeBase64 });
+
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
-
-    // Interakt API Configuration
     const interaktApiUrl = "https://api.interakt.io/v1";
     const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
 
-    // SSL workaround (temporary fix)
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false // Not recommended for production
-    });
+    // Convert base64 to buffer
+    const qrBuffer = Buffer.from(qrBase64, "base64");
+    const barcodeBuffer = Buffer.from(barcodeBase64, "base64");
 
-    // Debug: Log the request
-    console.log("🔍 Sending to Interakt:", {
-      url: `${interaktApiUrl}/whatsapp/send`,
-      phone: interaktNumber,
-      qrUrl,
-      barcodeUrl
+    // Upload to cloud (e.g., Google Drive, AWS S3, etc.)
+    const qrUrl = await uploadToCloud(qrBuffer, "qr.png");
+    const barcodeUrl = await uploadToCloud(barcodeBuffer, "barcode.png");
+
+    // SSL workaround
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false // Temporary fix
     });
 
     // Send QR Code via Interakt
@@ -202,22 +201,37 @@ app.post("/share-interakt", async (req, res) => {
 });
 
 // ==============================
-// ✅ UPLOAD TO GOOGLE DRIVE (IMPLEMENTATION NEEDED)
+// ✅ UPLOAD TO CLOUD (IMPLEMENTATION NEEDED)
 // ==============================
-async function uploadToGoogleDrive(filePath, filename) {
+async function uploadToCloud(buffer, filename) {
   try {
-    // TODO: Replace with actual Google Drive API integration
-    // Example:
-    // 1. Set up Google Cloud Console project
-    // 2. Create Service Account & download credentials
-    // 3. Install Google Drive API: `npm install @googleapis/drive`
-    // 4. Implement upload logic
-    
-    // For now, return a placeholder URL
-    return `https://drive.google.com/uc?id=${uuidv4()}`;
-    
+    // Option 1: Google Drive API (requires setup)
+    // const auth = new google.auth.GoogleAuth({ keyFile: 'credentials.json', scopes: ['https://www.googleapis.com/auth/drive'] });
+    // const drive = google.drive({ version: 'v3', auth });
+    // const response = await drive.files.create({ resource: { name: filename }, media: { mimeType: 'image/png', body: buffer } });
+    // return `https://drive.google.com/uc?id=${response.data.id}`;
+
+    // Option 2: AWS S3 (requires setup)
+    // const s3 = new AWS.S3();
+    // const params = { Bucket: 'your-bucket', Key: filename, Body: buffer, ContentType: 'image/png' };
+    // const result = await s3.upload(params).promise();
+    // return result.Location;
+
+    // Option 3: Imgur (free, temporary hosting)
+    const formData = new FormData();
+    formData.append('image', buffer.toString('base64'));
+    formData.append('type', 'base64');
+
+    const imgurResponse = await axios.post('https://api.imgur.com/3/image', formData, {
+      headers: {
+        'Authorization': 'Client-ID YOUR_IMGUR_CLIENT_ID'
+      }
+    });
+
+    return imgurResponse.data.data.link;
+
   } catch (err) {
-    console.error("❌ Google Drive Upload Error:", err);
+    console.error("❌ Cloud Upload Error:", err);
     return null;
   }
 }
