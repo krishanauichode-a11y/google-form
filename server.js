@@ -11,24 +11,19 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Render database configuration
+// Database connection
 const pool = new Pool({
-  user: process.env.DB_USER || "postgres.ufbttlxvzuchacptqkee",
-  host: process.env.DB_HOST || "aws-1-ap-south-1.pooler.supabase.com",
-  database: process.env.DB_NAME || "postgres",
-  password: process.env.DB_PASSWORD || "1lqW1fYbCxK4jgr9",
-  port: process.env.DB_PORT || 5432,
+  user: "postgres.ufbttlxvzuchacptqkee",
+  host: "aws-1-ap-south-1.pooler.supabase.com",
+  database: "postgres",
+  password: "1lqW1fYbCxK4jgr9",
+  port: 5432,
   ssl: { rejectUnauthorized: false }
 });
 
 // Test route
 app.get("/", (req, res) => {
   res.send("✅ Server Running");
-});
-
-// Health check for Render
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
 });
 
 // Create user with QR/Barcode
@@ -54,7 +49,7 @@ app.post("/create", async (req, res) => {
     );
 
     // Generate QR and Barcode
-    const url = `${process.env.APP_URL || "https://google-form-kebh.onrender.com"}/user/${id}`;
+    const url = `https://google-form-kebh.onrender.com/user/${id}`;
     const qr = await QRCode.toDataURL(url);
     
     const barcodeBuffer = await bwipjs.toBuffer({
@@ -71,19 +66,12 @@ app.post("/create", async (req, res) => {
     const qrPath = saveTempFile(id, "qr", qr);
     const barcodePath = saveTempFile(id, "barcode", barcodeBuffer);
 
-    // Construct public URLs
-    const baseUrl = process.env.APP_URL || "https://google-form-kebh.onrender.com";
-    const qrUrl = `${baseUrl}/media/${id}/qr`;
-    const barcodeUrl = `${baseUrl}/media/${id}/barcode`;
-
     res.json({
       success: true,
       id,
       url,
       qr,
       barcode: barcodeBuffer.toString("base64"),
-      qrUrl,
-      barcodeUrl,
       qrPath,
       barcodePath
     });
@@ -94,33 +82,29 @@ app.post("/create", async (req, res) => {
   }
 });
 
-// Send QR/Barcode directly via Interakt (no template)
-app.post("/send-direct-media", async (req, res) => {
+// Share via Interakt
+app.post("/share-interakt", async (req, res) => {
   try {
-    const { id, qrUrl, barcodeUrl } = req.body;
+    const { id } = req.body;
+    const user = await getUser(id);
     
-    // Fetch user data
-    const userResult = await pool.query("SELECT phone FROM users WHERE id=$1", [id]);
-    if (userResult.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    
-    const user = userResult.rows[0];
-    const phoneNumber = user.phone.startsWith("+") ? user.phone : "+91" + user.phone;
-    
-    // Send QR Code
-    await sendDirectMedia(phoneNumber, qrUrl, "QR Code");
-    
+
+    const interaktNumber = user.phone.startsWith("+") ? user.phone : `+91${user.phone}`;
+    const baseUrl = req.protocol + '://' + req.get('host');
+    const qrUrl = `${baseUrl}/media/${id}/qr`;
+    const barcodeUrl = `${baseUrl}/media/${id}/barcode`;
+
+    // Send QR
+    await sendInteraktMessage(interaktNumber, "student_qr", qrUrl);
     // Send Barcode
-    await sendDirectMedia(phoneNumber, barcodeUrl, "Barcode");
-    
-    res.json({ 
-      success: true,
-      message: "Media messages sent to " + phoneNumber
-    });
-    
+    await sendInteraktMessage(interaktNumber, "student_barcode", barcodeUrl);
+
+    res.json({ success: true });
   } catch (err) {
-    console.error("❌ Direct Media Error:", err);
+    console.error("❌ Interakt Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -177,7 +161,7 @@ app.get("/media/:id/:type", (req, res) => {
 function ensureTempDir() {
   const tempDir = path.join(__dirname, "temp");
   if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
+    fs.mkdirSync(tempDir);
   }
 }
 
@@ -192,47 +176,25 @@ async function getUser(id) {
   return result.rows[0];
 }
 
-async function sendDirectMedia(phone, mediaUrl, mediaType) {
-  const interaktApiKey = process.env.INTERAKT_API_KEY;
-  const workspaceId = process.env.INTERAKT_WORKSPACE_ID;
+async function sendInteraktMessage(phone, template, mediaUrl) {
+  const response = await fetch("https://api.interakt.io/v1b1d8bd09-6cdd-41a5-bc0e-83345f9f4f05/whatsapp/sendTemplateMessage", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo="
+    },
+    body: JSON.stringify({
+      whatsappNumber: phone,
+      templateName: template,
+      languageCode: "en",
+      header: { type: "media", mediaUrl }
+    })
+  });
   
-  if (!interaktApiKey || !workspaceId) {
-    console.error("❌ Interakt credentials not configured");
-    return;
-  }
-  
-  const payload = {
-    phoneNumber: phone,
-    message: `Your ${mediaType} is attached:`,
-    mediaUrl: mediaUrl
-  };
-  
-  try {
-    const response = await fetch(
-      `https://api.interakt.io/v1/${workspaceId}/whatsapp/sendMedia`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${interaktApiKey}`
-        },
-        body: JSON.stringify(payload)
-      }
-    );
-    
-    console.log(`📱 ${mediaType} sent: ${response.ok}`);
-    
-    if (!response.ok) {
-      console.log(`📱 ${mediaType} error:`, await response.text());
-    }
-    
-  } catch (err) {
-    console.error(`❌ ${mediaType} send failed:`, err);
-    throw err;
-  }
+  return response.ok;
 }
 
-// Start server - FIXED SYNTAX
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
