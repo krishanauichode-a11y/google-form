@@ -123,11 +123,21 @@ app.post("/create", async (req, res) => {
 app.post("/share-interakt", async (req, res) => {
   try {
     const { phone, qrUrl, barcodeUrl } = req.body;
+
+    // Convert phone to international format
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
 
-    // Use HTTP instead of HTTPS (temporary fix)
-    const interaktApiUrl = "http://api.interakt.io/v1"; // Note: HTTP, not HTTPS
+    // Interakt API Configuration
+    const interaktApiUrl = "https://api.interakt.io/v1";
     const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
+
+    // Debug: Log the request
+    console.log("🔍 Sending to Interakt:", {
+      url: `${interaktApiUrl}/whatsapp/send`,
+      phone: interaktNumber,
+      qrUrl,
+      barcodeUrl
+    });
 
     // Send QR Code
     const qrResponse = await axios.post(
@@ -170,7 +180,7 @@ app.post("/share-interakt", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ Interakt Error:", err.message);
+    console.error("❌ Interakt Error:", err.response?.data || err.message);
     res.status(500).json({ error: err.message });
   }
 });
