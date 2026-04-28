@@ -6,8 +6,6 @@ const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios");
-const https = require("https");
 
 const app = express();
 app.use(express.json());
@@ -102,18 +100,14 @@ app.post("/create", async (req, res) => {
     fs.writeFileSync(qrPath, qr.split(",")[1], "base64");
     fs.writeFileSync(barcodePath, barcodeBuffer, "base64");
 
-    // Upload to Google Drive (or cloud storage)
-    const qrUrl = await uploadToGoogleDrive(qrPath, `${id}-qr.png`);
-    const barcodeUrl = await uploadToGoogleDrive(barcodePath, `${id}-barcode.png`);
-
     res.json({
       success: true,
       id,
       url,
       qr,
       barcode: barcodeBuffer.toString("base64"),
-      qrUrl,
-      barcodeUrl
+      qrPath,
+      barcodePath
     });
 
   } catch (err) {
@@ -123,118 +117,62 @@ app.post("/create", async (req, res) => {
 });
 
 // ==============================
-// ✅ SHARE VIA INTERAKT (FIXED WITH SSL HANDLING)
+// ✅ SHARE VIA INTERAKT
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
-    const { phone, qrBase64, barcodeBase64 } = req.body;
+    const { phone, qrPath, barcodePath } = req.body;
 
-    console.log("🔍 Interakt Request:", { phone, qrBase64, barcodeBase64 });
-
+    // Convert phone to international format
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
+
+    // Interakt API Configuration (replace with your actual credentials)
     const interaktApiUrl = "https://api.interakt.io/v1";
     const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
 
-    // Convert base64 to buffer
-    const qrBuffer = Buffer.from(qrBase64, "base64");
-    const barcodeBuffer = Buffer.from(barcodeBase64, "base64");
-
-    // Upload to cloud (e.g., Google Drive, AWS S3, etc.)
-    const qrUrl = await uploadToCloud(qrBuffer, "qr.png");
-    const barcodeUrl = await uploadToCloud(barcodeBuffer, "barcode.png");
-
-    // SSL workaround
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false // Temporary fix
-    });
-
-    // Send QR Code via Interakt
-    const qrResponse = await axios.post(
-      `${interaktApiUrl}/whatsapp/send`,
-      {
+    // Send QR Code
+    const qrResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${interaktApiKey}`
+      },
+      body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your QR Code:",
-        mediaUrl: qrUrl
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${interaktApiKey}`
-        },
-        httpsAgent,
-        timeout: 30000
-      }
-    );
+        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your QR URL
+      })
+    });
 
-    // Send Barcode via Interakt
-    const barcodeResponse = await axios.post(
-      `${interaktApiUrl}/whatsapp/send`,
-      {
+    // Send Barcode
+    const barcodeResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${interaktApiKey}`
+      },
+      body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your Barcode:",
-        mediaUrl: barcodeUrl
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${interaktApiKey}`
-        },
-        httpsAgent,
-        timeout: 30000
-      }
-    );
+        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your barcode URL
+      })
+    });
 
     // Log results
-    console.log("📱 QR Sent:", qrResponse.status === 200);
-    console.log("📱 Barcode Sent:", barcodeResponse.status === 200);
+    console.log("📱 QR Sent:", qrResponse.ok);
+    console.log("📱 Barcode Sent:", barcodeResponse.ok);
 
     res.json({
       success: true,
-      qrSent: qrResponse.status === 200,
-      barcodeSent: barcodeResponse.status === 200
+      qrSent: qrResponse.ok,
+      barcodeSent: barcodeResponse.ok
     });
 
   } catch (err) {
-    console.error("❌ Interakt Error:", err.response?.data || err.message);
+    console.error("❌ Interakt Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
-
-// ==============================
-// ✅ UPLOAD TO CLOUD (IMPLEMENTATION NEEDED)
-// ==============================
-async function uploadToCloud(buffer, filename) {
-  try {
-    // Option 1: Google Drive API (requires setup)
-    // const auth = new google.auth.GoogleAuth({ keyFile: 'credentials.json', scopes: ['https://www.googleapis.com/auth/drive'] });
-    // const drive = google.drive({ version: 'v3', auth });
-    // const response = await drive.files.create({ resource: { name: filename }, media: { mimeType: 'image/png', body: buffer } });
-    // return `https://drive.google.com/uc?id=${response.data.id}`;
-
-    // Option 2: AWS S3 (requires setup)
-    // const s3 = new AWS.S3();
-    // const params = { Bucket: 'your-bucket', Key: filename, Body: buffer, ContentType: 'image/png' };
-    // const result = await s3.upload(params).promise();
-    // return result.Location;
-
-    // Option 3: Imgur (free, temporary hosting)
-    const formData = new FormData();
-    formData.append('image', buffer.toString('base64'));
-    formData.append('type', 'base64');
-
-    const imgurResponse = await axios.post('https://api.imgur.com/3/image', formData, {
-      headers: {
-        'Authorization': 'Client-ID YOUR_IMGUR_CLIENT_ID'
-      }
-    });
-
-    return imgurResponse.data.data.link;
-
-  } catch (err) {
-    console.error("❌ Cloud Upload Error:", err);
-    return null;
-  }
-}
 
 // ==============================
 // ✅ USER PAGE (DISPLAYS USER DETAILS)
