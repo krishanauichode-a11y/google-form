@@ -121,59 +121,58 @@ app.post("/create", async (req, res) => {
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
-    const { phone, qrPath, barcodePath } = req.body;
-
-    // Convert phone to international format
+    const { phone, qrUrl, barcodeUrl } = req.body;
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
 
-    // Interakt API Configuration (replace with your actual credentials)
-    const interaktApiUrl = "https://api.interakt.io/v1";
+    // Use HTTP instead of HTTPS (temporary fix)
+    const interaktApiUrl = "http://api.interakt.io/v1"; // Note: HTTP, not HTTPS
     const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
 
     // Send QR Code
-    const qrResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
-      },
-      body: JSON.stringify({
+    const qrResponse = await axios.post(
+      `${interaktApiUrl}/whatsapp/send`,
+      {
         phoneNumber: interaktNumber,
         message: "Your QR Code:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your QR URL
-      })
-    });
+        mediaUrl: qrUrl
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${interaktApiKey}`
+        },
+        timeout: 30000
+      }
+    );
 
     // Send Barcode
-    const barcodeResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
-      },
-      body: JSON.stringify({
+    const barcodeResponse = await axios.post(
+      `${interaktApiUrl}/whatsapp/send`,
+      {
         phoneNumber: interaktNumber,
         message: "Your Barcode:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your barcode URL
-      })
-    });
-
-    // Log results
-    console.log("📱 QR Sent:", qrResponse.ok);
-    console.log("📱 Barcode Sent:", barcodeResponse.ok);
+        mediaUrl: barcodeUrl
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${interaktApiKey}`
+        },
+        timeout: 30000
+      }
+    );
 
     res.json({
       success: true,
-      qrSent: qrResponse.ok,
-      barcodeSent: barcodeResponse.ok
+      qrSent: qrResponse.status === 200,
+      barcodeSent: barcodeResponse.status === 200
     });
 
   } catch (err) {
-    console.error("❌ Interakt Error:", err);
+    console.error("❌ Interakt Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
-
 // ==============================
 // ✅ USER PAGE (DISPLAYS USER DETAILS)
 // ==============================
