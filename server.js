@@ -11,9 +11,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// ==============================
-// ✅ SUPABASE DATABASE (FIXED)
-// ==============================
+// Database connection
 const pool = new Pool({
   user: "postgres.ufbttlxvzuchacptqkee",
   host: "aws-1-ap-south-1.pooler.supabase.com",
@@ -23,82 +21,50 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// ==============================
-// ✅ TEST ROUTE
-// ==============================
+// Test route
 app.get("/", (req, res) => {
   res.send("✅ Server Running");
 });
 
-// ==============================
-// ✅ CREATE USER (WITH QR & BARCODE)
-// ==============================
+// Create user with QR/Barcode
 app.post("/create", async (req, res) => {
   try {
-    const {
-      fullName,
-      address,
-      email,
-      phone,
-      dob,
-      date,
-      tradingMarket,
-      tradingType,
-      source,
-      softwareUsed,
-      previousCourse,
-      level,
-      amount,
-      paymentMode
-    } = req.body;
-
-    console.log("📩 Incoming Data:", req.body);
-
+    const payload = req.body;
     const id = uuidv4();
 
+    // Insert into database
     await pool.query(
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
         trading_market, trading_type, source,
         software_used, previous_course, level,
         amount, payment_mode
-      )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [
-        id, fullName, address, email, phone, dob, date,
-        tradingMarket, tradingType, source,
-        softwareUsed, previousCourse, level,
-        amount, paymentMode
+        id, payload.fullName, payload.address, payload.email, payload.phone,
+        payload.dob, new Date().toISOString(), payload.tradingMarket,
+        payload.tradingType, payload.source, payload.softwareUsed,
+        payload.previousCourse, payload.level, payload.amount, payload.paymentMode
       ]
     );
 
+    // Generate QR and Barcode
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
-
-    // Generate QR Code
     const qr = await QRCode.toDataURL(url);
-
-    // Generate Barcode (smaller and scannable)
+    
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id.substring(0, 12),
       scale: 2,
-      height: 5,
+      height: 10,
       includetext: false,
-      textxalign: "center",
+      textxalign: "center"
     });
 
-    // Save QR and Barcode to temporary files
-    const qrPath = path.join(__dirname, "temp", `${id}-qr.png`);
-    const barcodePath = path.join(__dirname, "temp", `${id}-barcode.png`);
-
-    // Ensure temp directory exists
-    if (!fs.existsSync(path.join(__dirname, "temp"))) {
-      fs.mkdirSync(path.join(__dirname, "temp"));
-    }
-
     // Save files
-    fs.writeFileSync(qrPath, qr.split(",")[1], "base64");
-    fs.writeFileSync(barcodePath, barcodeBuffer, "base64");
+    ensureTempDir();
+    const qrPath = saveTempFile(id, "qr", qr);
+    const barcodePath = saveTempFile(id, "barcode", barcodeBuffer);
 
     res.json({
       success: true,
@@ -116,84 +82,45 @@ app.post("/create", async (req, res) => {
   }
 });
 
-// ==============================
-// ✅ SHARE VIA INTERAKT
-// ==============================
+// Share via Interakt
 app.post("/share-interakt", async (req, res) => {
   try {
-    const { phone, qrPath, barcodePath } = req.body;
+    const { id } = req.body;
+    const user = await getUser(id);
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-    // Convert phone to international format
-    const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
+    const interaktNumber = user.phone.startsWith("+") ? user.phone : `+91${user.phone}`;
+    const baseUrl = req.protocol + '://' + req.get('host');
+    const qrUrl = `${baseUrl}/media/${id}/qr`;
+    const barcodeUrl = `${baseUrl}/media/${id}/barcode`;
 
-    // Interakt API Configuration (replace with your actual credentials)
-    const interaktApiUrl = "https://api.interakt.io/v1";
-    const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
-
-    // Send QR Code
-    const qrResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
-      },
-      body: JSON.stringify({
-        phoneNumber: interaktNumber,
-        message: "Your QR Code:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your QR URL
-      })
-    });
-
+    // Send QR
+    await sendInteraktMessage(interaktNumber, "student_qr", qrUrl);
     // Send Barcode
-    const barcodeResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
-      },
-      body: JSON.stringify({
-        phoneNumber: interaktNumber,
-        message: "Your Barcode:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your barcode URL
-      })
-    });
+    await sendInteraktMessage(interaktNumber, "student_barcode", barcodeUrl);
 
-    // Log results
-    console.log("📱 QR Sent:", qrResponse.ok);
-    console.log("📱 Barcode Sent:", barcodeResponse.ok);
-
-    res.json({
-      success: true,
-      qrSent: qrResponse.ok,
-      barcodeSent: barcodeResponse.ok
-    });
-
+    res.json({ success: true });
   } catch (err) {
     console.error("❌ Interakt Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==============================
-// ✅ USER PAGE (DISPLAYS USER DETAILS)
-// ==============================
+// User details page
 app.get("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
-    const result = await pool.query(
-      "SELECT * FROM users WHERE id=$1",
-      [id]
-    );
-
-    if (result.rows.length === 0) {
+    const user = await getUser(id);
+    
+    if (!user) {
       return res.send("<h2>❌ Invalid QR Code</h2>");
     }
 
-    const user = result.rows[0];
-
     res.send(`
-      <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
+      <div style="text-align:center; font-family:sans-serif; padding:20px;">
         <h2>✅ Verified Student</h2>
         <p><strong>Name:</strong> ${user.full_name}</p>
         <p><strong>Email:</strong> ${user.email}</p>
@@ -212,16 +139,62 @@ app.get("/user/:id", async (req, res) => {
         <p><small>Scan this QR/Barcode again to reload</small></p>
       </div>
     `);
-
   } catch (err) {
     console.error(err);
     res.send("Error loading user");
   }
 });
 
-// ==============================
-// 🚀 START SERVER (FIXED FOR RENDER)
-// ==============================
+// Serve media files
+app.get("/media/:id/:type", (req, res) => {
+  const { id, type } = req.params;
+  const filePath = path.join(__dirname, "temp", `${id}-${type}.png`);
+  
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send("File not found");
+  }
+});
+
+// Helper functions
+function ensureTempDir() {
+  const tempDir = path.join(__dirname, "temp");
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir);
+  }
+}
+
+function saveTempFile(id, type, data) {
+  const filePath = path.join(__dirname, "temp", `${id}-${type}.png`);
+  fs.writeFileSync(filePath, data);
+  return filePath;
+}
+
+async function getUser(id) {
+  const result = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+  return result.rows[0];
+}
+
+async function sendInteraktMessage(phone, template, mediaUrl) {
+  const response = await fetch("https://api.interakt.io/v1/YOUR_WORKSPACE_ID/whatsapp/sendTemplateMessage", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo="
+    },
+    body: JSON.stringify({
+      whatsappNumber: phone,
+      templateName: template,
+      languageCode: "en",
+      header: { type: "media", mediaUrl }
+    })
+  });
+  
+  return response.ok;
+}
+
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
