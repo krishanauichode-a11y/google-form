@@ -121,48 +121,55 @@ app.post("/create", async (req, res) => {
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
-    const { phone, qrUrl, barcodeUrl, fullName } = req.body;
+    const { phone, qrPath, barcodePath } = req.body;
 
-    console.log("🔍 Interakt Request:", { phone, fullName, qrUrl, barcodeUrl });
-
+    // Convert phone to international format
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
+
+    // Interakt API Configuration (replace with your actual credentials)
     const interaktApiUrl = "https://api.interakt.io/v1";
     const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
 
-    // SSL workaround
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false
+    // Send QR Code
+    const qrResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${interaktApiKey}`
+      },
+      body: JSON.stringify({
+        phoneNumber: interaktNumber,
+        message: "Your QR Code:",
+        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your QR URL
+      })
     });
 
-    // Send using Interakt Template
-    const response = await axios.post(
-      `${interaktApiUrl}/whatsapp/send`,
-      {
-        phoneNumber: interaktNumber,
-        templateId: "your_template_id", // Replace with your Interakt template ID
-        templateParams: {
-          name: fullName || "Student",
-          qr_url: qrUrl,
-          barcode_url: barcodeUrl
-        }
+    // Send Barcode
+    const barcodeResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${interaktApiKey}`
       },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${interaktApiKey}`
-        },
-        httpsAgent,
-        timeout: 30000
-      }
-    );
+      body: JSON.stringify({
+        phoneNumber: interaktNumber,
+        message: "Your Barcode:",
+        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your barcode URL
+      })
+    });
+
+    // Log results
+    console.log("📱 QR Sent:", qrResponse.ok);
+    console.log("📱 Barcode Sent:", barcodeResponse.ok);
 
     res.json({
       success: true,
-      messageSent: response.status === 200
+      qrSent: qrResponse.ok,
+      barcodeSent: barcodeResponse.ok
     });
 
   } catch (err) {
-    console.error("❌ Interakt Error:", err.response?.data || err.message);
+    console.error("❌ Interakt Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
