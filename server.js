@@ -82,29 +82,33 @@ app.post("/create", async (req, res) => {
   }
 });
 
-// Share via Interakt
-app.post("/share-interakt", async (req, res) => {
+// Send QR/Barcode directly via Interakt (no template)
+app.post("/send-direct-media", async (req, res) => {
   try {
-    const { id } = req.body;
-    const user = await getUser(id);
+    const { id, qrUrl, barcodeUrl } = req.body;
     
-    if (!user) {
+    // Fetch user data
+    const userResult = await pool.query("SELECT phone FROM users WHERE id=$1", [id]);
+    if (userResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
-
-    const interaktNumber = user.phone.startsWith("+") ? user.phone : `+91${user.phone}`;
-    const baseUrl = req.protocol + '://' + req.get('host');
-    const qrUrl = `${baseUrl}/media/${id}/qr`;
-    const barcodeUrl = `${baseUrl}/media/${id}/barcode`;
-
-    // Send QR
-    await sendInteraktMessage(interaktNumber, "student_qr", qrUrl);
+    
+    const user = userResult.rows[0];
+    const phoneNumber = user.phone.startsWith("+") ? user.phone : "+91" + user.phone;
+    
+    // Send QR Code
+    await sendDirectMedia(phoneNumber, qrUrl, "QR Code");
+    
     // Send Barcode
-    await sendInteraktMessage(interaktNumber, "student_barcode", barcodeUrl);
-
-    res.json({ success: true });
+    await sendDirectMedia(phoneNumber, barcodeUrl, "Barcode");
+    
+    res.json({ 
+      success: true,
+      message: "Media messages sent to " + phoneNumber
+    });
+    
   } catch (err) {
-    console.error("❌ Interakt Error:", err);
+    console.error("❌ Direct Media Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -176,26 +180,48 @@ async function getUser(id) {
   return result.rows[0];
 }
 
-async function sendInteraktMessage(phone, template, mediaUrl) {
-  const response = await fetch("https://api.interakt.io/v1/YOUR_WORKSPACE_ID/whatsapp/sendTemplateMessage", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo="
-    },
-    body: JSON.stringify({
-      whatsappNumber: phone,
-      templateName: template,
-      languageCode: "en",
-      header: { type: "media", mediaUrl }
-    })
-  });
+async function sendDirectMedia(phone, mediaUrl, mediaType) {
+  const interaktApiKey = process.env.INTERAKT_API_KEY;
+  const workspaceId = process.env.INTERAKT_WORKSPACE_ID;
   
-  return response.ok;
+  if (!interaktApiKey || !workspaceId) {
+    console.error("❌ Interakt credentials not configured");
+    return;
+  }
+  
+  const payload = {
+    phoneNumber: phone,
+    message: `Your ${mediaType} is attached:`,
+    mediaUrl: mediaUrl
+  };
+  
+  try {
+    const response = await fetch(
+      `https://api.interakt.io/v1/${workspaceId}/whatsapp/sendMedia`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${interaktApiKey}`
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+    
+    console.log(`📱 ${mediaType} sent: ${response.ok}`);
+    
+    if (!response.ok) {
+      console.log(`📱 ${mediaType} error:`, await response.text());
+    }
+    
+  } catch (err) {
+    console.error(`❌ ${mediaType} send failed:`, err);
+    throw err;
+  }
 }
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, => {
   console.log("🚀 Server running on port " + PORT);
 });
