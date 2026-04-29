@@ -138,22 +138,22 @@ app.post("/share-interakt", async (req, res) => {
     const phoneNumber = phone.replace("+91", "").replace("+", "");
 
     // ✅ CORRECT ENDPOINT (.ai)
-    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-      },
-      body: JSON.stringify({
-        countryCode: "+91",
-        phoneNumber: phoneNumber,
-        type: "Media",
-        media: {
-          url: finalImageUrl,
-          caption: "🎟️ Your Entry Pass\nScan QR or Barcode at entry"
-        }
-      })
-    });
+   const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+  },
+  body: JSON.stringify({
+    countryCode: "+91",
+    phoneNumber: phoneNumber,
+    type: "Image",
+    image: {
+      url: finalImageUrl,
+      caption: "🎟️ Your Entry Pass\nScan QR or barcode at entry"
+    }
+  })
+});
 
     const data = await response.json();
     console.log("📱 Interakt Response:", data);
