@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
-const fetch = require("node-fetch");
+const fetch = require("node-fetch"); // IMPORTANT
 const { createCanvas, loadImage } = require("canvas");
 
 const app = express();
@@ -26,15 +26,10 @@ const pool = new Pool({
 });
 
 // ==============================
-// ✅ TEMP FOLDER SETUP
+// ✅ TEMP FOLDER
 // ==============================
 const tempDir = path.join(__dirname, "temp");
-
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir);
-}
-
-// Serve temp files
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 app.use("/temp", express.static(tempDir));
 
 // ==============================
@@ -45,7 +40,7 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE
+// 🎟️ CREATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
   const qrPath = path.join(tempDir, `${id}-qr.png`);
@@ -57,22 +52,16 @@ async function generateFinalImage(id) {
   const canvas = createCanvas(700, 900);
   const ctx = canvas.getContext("2d");
 
-  // Background
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, 700, 900);
 
-  // Title
   ctx.fillStyle = "#000";
   ctx.font = "bold 34px Arial";
   ctx.fillText("ENTRY PASS", 230, 60);
 
-  // QR
   ctx.drawImage(qr, 200, 120, 300, 300);
-
-  // Barcode
   ctx.drawImage(barcode, 100, 480, 500, 150);
 
-  // Footer
   ctx.font = "20px Arial";
   ctx.fillText("Scan QR or Barcode at Entry", 170, 750);
 
@@ -83,7 +72,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER + QR + BARCODE
+// 👤 CREATE USER
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -128,30 +117,28 @@ app.post("/create", async (req, res) => {
     });
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
-    res.json({
-      success: true,
-      id,
-      url
-    });
+    res.json({ success: true, id });
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error("❌ CREATE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 📲 SEND WHATSAPP + CLEANUP
+// 📲 SHARE VIA INTERAKT
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
+    // Generate final ticket
     const finalImageUrl = await generateFinalImage(id);
 
     const phoneNumber = phone.replace("+91", "").replace("+", "");
 
-    const response = await fetch("https://api.interakt.io/v1/public/message/", {
+    // ✅ CORRECT ENDPOINT (.ai)
+    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -169,16 +156,17 @@ app.post("/share-interakt", async (req, res) => {
     });
 
     const data = await response.json();
+    console.log("📱 Interakt Response:", data);
 
-    // 🧹 AUTO DELETE AFTER 1 MIN
+    // 🧹 Auto delete after 1 min
     setTimeout(() => {
       try {
         fs.unlinkSync(path.join(tempDir, `${id}-qr.png`));
         fs.unlinkSync(path.join(tempDir, `${id}-barcode.png`));
         fs.unlinkSync(path.join(tempDir, `${id}-final.png`));
-        console.log("🧹 Temp files deleted");
-      } catch (err) {
-        console.log("Cleanup error:", err.message);
+        console.log("🧹 Temp cleaned");
+      } catch (e) {
+        console.log("Cleanup error:", e.message);
       }
     }, 60000);
 
@@ -194,19 +182,18 @@ app.post("/share-interakt", async (req, res) => {
 // 👤 USER PAGE
 // ==============================
 app.get("/user/:id", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM users WHERE id=$1",
-      [req.params.id]
-    );
+  const result = await pool.query(
+    "SELECT * FROM users WHERE id=$1",
+    [req.params.id]
+  );
 
-    if (result.rows.length === 0) {
-      return res.send("<h2>❌ Invalid QR</h2>");
-    }
+  if (result.rows.length === 0) {
+    return res.send("<h2>❌ Invalid QR</h2>");
+  }
 
-    const u = result.rows[0];
+  const u = result.rows[0];
 
-    res.send(`
+res.send(`
       <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
         <h2>✅ Verified Student</h2>
         <p><strong>Name:</strong> ${user.full_name}</p>
@@ -226,16 +213,12 @@ app.get("/user/:id", async (req, res) => {
         <p><small>Scan this QR/Barcode again to reload</small></p>
       </div>
     `);
-
-  } catch (err) {
-    res.send("Error loading user");
-  }
 });
 
 // ==============================
-// 🚀 START SERVER
+// 🚀 START
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("🚀 Server running on port " + PORT);
+  console.log("🚀 Running on port " + PORT);
 });
