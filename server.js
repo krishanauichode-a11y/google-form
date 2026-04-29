@@ -246,19 +246,19 @@ body {
 <div class="card">
 <div class="badge">✔ Verified</div>
 <div class="title">Student Pass</div>
- <div class ="info"><strong>Name:</strong> ${user.full_name}</div>
-        <div class ="info"><strong>Email:</strong> ${user.email}</div>
-        <div class ="info"><strong>Phone:</strong> ${user.phone}</div>
-        <div class ="info"><strong>Address:</strong> ${user.address}</div>
-        <div class ="info"><strong>Date of Birth:</strong> ${user.dob}</div>
-        <div class ="info"><strong>Trading Market:</strong> ${user.trading_market}</div>
-        <div class ="info"><strong>Trading Type:</strong> ${user.trading_type}</div>
-        <div class ="info"><strong>Source:</strong> ${user.source}</div>
-        <div class ="info"><strong>Software Used:</strong> ${user.software_used}</div>
-        <div class ="info"><strong>Previous Course:</strong> ${user.previous_course}</div>
-        <div class ="info"><strong>Level:</strong> ${user.level}</div>
-        <div class ="info"><strong>Amount Paid:</strong> ${user.amount}</div>
-        <div class ="info"><strong>Payment Mode:</strong> ${user.payment_mode}</div>
+ <div class ="info"><strong>Name:</strong> ${u.full_name}</div>
+        <div class ="info"><strong>Email:</strong> ${u.email}</div>
+        <div class ="info"><strong>Phone:</strong> ${u.phone}</div>
+        <div class ="info"><strong>Address:</strong> ${u.address}</div>
+        <div class ="info"><strong>Date of Birth:</strong> ${u.dob}</div>
+        <div class ="info"><strong>Trading Market:</strong> ${u.trading_market}</div>
+        <div class ="info"><strong>Trading Type:</strong> ${u.trading_type}</div>
+        <div class ="info"><strong>Source:</strong> ${u.source}</div>
+        <div class ="info"><strong>Software Used:</strong> ${u.software_used}</div>
+        <div class ="info"><strong>Previous Course:</strong> ${u.previous_course}</div>
+        <div class ="info"><strong>Level:</strong> ${u.level}</div>
+        <div class ="info"><strong>Amount Paid:</strong> ${u.amount}</div>
+        <div class ="info"><strong>Payment Mode:</strong> ${u.payment_mode}</div>
 <hr>
 <p style="text-align:center;font-size:12px;">Scan QR / Barcode again</p>
 </div>
