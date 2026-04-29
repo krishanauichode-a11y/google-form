@@ -87,17 +87,20 @@ app.post("/create", async (req, res) => {
 
     fs.writeFileSync(qrPath, qrBuffer);
 
-    // Generate Barcode (FIXED - with full URL)
+    // Generate Barcode (NARROW & MACHINE-SCANNABLE)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: url, // Full URL instead of just UUID
-      scale: 5,
-      height: 20,
-      includetext: true,
+      text: url, // Full URL
+      scale: 0.8,  // Reduced scale for narrower bars
+      width: 1,    // Explicitly set narrow width
+      height: 10,  // Shorter height
+      includetext: false, // Remove text to save space
       textxalign: "center",
-      padding: 10,
+      padding: 1,  // Minimal padding
       backgroundcolor: "ffffff",
-      barcolor: "000000"
+      barcolor: "000000",
+      guardwhitespace: false, // Remove extra whitespace
+      parsealt: true, // Enable parsing for better machine readability
     });
 
     const barcodePath = path.join(__dirname, "temp", `${id}-barcode.png`);
