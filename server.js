@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
-const fetch = require("node-fetch"); // IMPORTANT
+const fetch = require("node-fetch");
 const { createCanvas, loadImage } = require("canvas");
 
 const app = express();
@@ -26,7 +26,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// ✅ TEMP FOLDER
+// ✅ TEMP STORAGE
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -40,7 +40,7 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// 🎟️ CREATE FINAL IMAGE
+// 🎟️ GENERATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
   const qrPath = path.join(tempDir, `${id}-qr.png`);
@@ -126,47 +126,65 @@ app.post("/create", async (req, res) => {
 });
 
 // ==============================
-// 📲 SHARE VIA INTERAKT
+// 📲 SHARE INTERAKT
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
-    // Generate final ticket
+    // ✅ FETCH USER (FIXED ERROR)
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const user = result.rows[0];
+
+    // Generate final ticket image
     const finalImageUrl = await generateFinalImage(id);
 
     const phoneNumber = phone.replace("+91", "").replace("+", "");
 
-    // ✅ CORRECT ENDPOINT (.ai)
-   const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-  },
-  body: JSON.stringify({
-    countryCode: "+91",
-    phoneNumber: phoneNumber,
-    type: "Image",
-    image: {
-      url: finalImageUrl,
-      caption: "🎟️ Your Entry Pass\nScan QR or barcode at entry"
-    }
-  })
-});
+    // ✅ INTERAKT API CALL (FULLY FIXED)
+    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+      },
+      body: JSON.stringify({
+        countryCode: "+91",
+        phoneNumber: phoneNumber,
+        type: "Image",
+        data: {
+          image: {
+            url: finalImageUrl,
+            caption: `🎟️ Entry Pass
+Name: ${user.full_name}
+Course: ${user.trading_market}
+Amount: ₹${user.amount}
+Scan QR or Barcode at entry`
+          }
+        }
+      })
+    });
 
     const data = await response.json();
     console.log("📱 Interakt Response:", data);
 
-    // 🧹 Auto delete after 1 min
+    // 🧹 CLEANUP TEMP FILES
     setTimeout(() => {
       try {
         fs.unlinkSync(path.join(tempDir, `${id}-qr.png`));
         fs.unlinkSync(path.join(tempDir, `${id}-barcode.png`));
         fs.unlinkSync(path.join(tempDir, `${id}-final.png`));
-        console.log("🧹 Temp cleaned");
-      } catch (e) {
-        console.log("Cleanup error:", e.message);
+        console.log("🧹 Temp files deleted");
+      } catch (err) {
+        console.log("Cleanup error:", err.message);
       }
     }, 60000);
 
@@ -193,7 +211,7 @@ app.get("/user/:id", async (req, res) => {
 
   const u = result.rows[0];
 
-res.send(`
+    res.send(`
       <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
         <h2>✅ Verified Student</h2>
         <p><strong>Name:</strong> ${user.full_name}</p>
@@ -213,12 +231,11 @@ res.send(`
         <p><small>Scan this QR/Barcode again to reload</small></p>
       </div>
     `);
-});
 
 // ==============================
-// 🚀 START
+// 🚀 START SERVER
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("🚀 Running on port " + PORT);
+  console.log("🚀 Server running on port " + PORT);
 });
