@@ -193,32 +193,32 @@ app.get("/user/:id", async (req, res) => {
 
     const u = result.rows[0];
 
-   res.send(`
+    res.send(`
       <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
         <h2>✅ Verified Student</h2>
-        <p><strong>Name:</strong> ${user.full_name}</p>
-        <p><strong>Email:</strong> ${user.email}</p>
-        <p><strong>Phone:</strong> ${user.phone}</p>
-        <p><strong>Address:</strong> ${user.address}</p>
-        <p><strong>Date of Birth:</strong> ${user.dob}</p>
-        <p><strong>Trading Market:</strong> ${user.trading_market}</p>
-        <p><strong>Trading Type:</strong> ${user.trading_type}</p>
-        <p><strong>Source:</strong> ${user.source}</p>
-        <p><strong>Software Used:</strong> ${user.software_used}</p>
-        <p><strong>Previous Course:</strong> ${user.previous_course}</p>
-        <p><strong>Level:</strong> ${user.level}</p>
-        <p><strong>Amount Paid:</strong> ${user.amount}</p>
-        <p><strong>Payment Mode:</strong> ${user.payment_mode}</p>
+        <p><strong>Name:</strong> ${u.full_name}</p>
+        <p><strong>Email:</strong> ${u.email}</p>
+        <p><strong>Phone:</strong> ${u.phone}</p>
+        <p><strong>Address:</strong> ${u.address}</p>
+        <p><strong>Date of Birth:</strong> ${u.dob}</p>
+        <p><strong>Trading Market:</strong> ${u.trading_market}</p>
+        <p><strong>Trading Type:</strong> ${u.trading_type}</p>
+        <p><strong>Source:</strong> ${u.source}</p>
+        <p><strong>Software Used:</strong> ${u.software_used}</p>
+        <p><strong>Previous Course:</strong> ${u.previous_course}</p>
+        <p><strong>Level:</strong> ${u.level}</p>
+        <p><strong>Amount Paid:</strong> ${u.amount}</p>
+        <p><strong>Payment Mode:</strong> ${u.payment_mode}</p>
         <hr>
         <p><small>Scan this QR/Barcode again to reload</small></p>
       </div>
     `);
 
   } catch (err) {
+    console.error(err); // 👈 add this for debugging
     res.send("Error loading user");
   }
 });
-
 // ==============================
 // 🚀 START SERVER
 // ==============================
