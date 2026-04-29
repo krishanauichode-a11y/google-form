@@ -193,50 +193,117 @@ app.get("/user/:id", async (req, res) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verified Student</title>
 
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
 <style>
-body {
+* {
   margin:0;
-  font-family:sans-serif;
-  background:linear-gradient(135deg,#1e3c72,#2a5298);
+  padding:0;
+  box-sizing:border-box;
+  font-family: 'Poppins', sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
   display:flex;
   justify-content:center;
   align-items:center;
-  height:100vh;
+  min-height:100vh;
+  padding:15px;
 }
 
 .card {
-  background:#fff;
-  width:90%;
-  max-width:400px;
-  padding:20px;
-  border-radius:15px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  width:100%;
+  max-width:420px;
+  background:#ffffff;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 15px 40px rgba(0,0,0,0.4);
+  animation: fadeIn 0.6s ease;
 }
 
-.title {
+@keyframes fadeIn {
+  from {opacity:0; transform:translateY(20px);}
+  to {opacity:1; transform:translateY(0);}
+}
+
+/* HEADER */
+.card-header {
+  background: linear-gradient(135deg, #00c853, #009624);
+  color:#fff;
   text-align:center;
+  padding:20px;
+}
+
+.card-header h2 {
   font-size:22px;
-  color:green;
-  margin-bottom:10px;
-}
-
-.info {
-  margin:8px 0;
-  font-size:14px;
-}
-
-.info strong {
-  width:130px;
-  display:inline-block;
+  font-weight:600;
 }
 
 .badge {
-  text-align:center;
-  background:green;
-  color:#fff;
-  padding:5px;
+  background:#fff;
+  color:#00c853;
+  display:inline-block;
+  padding:5px 12px;
   border-radius:20px;
-  margin-bottom:10px;
+  font-size:12px;
+  margin-top:8px;
+  font-weight:600;
+}
+
+/* BODY */
+.card-body {
+  padding:20px;
+}
+
+.info {
+  display:flex;
+  justify-content:space-between;
+  padding:10px 0;
+  border-bottom:1px solid #eee;
+  font-size:14px;
+}
+
+.info span:first-child {
+  color:#555;
+  font-weight:500;
+}
+
+.info span:last-child {
+  font-weight:600;
+  color:#222;
+  text-align:right;
+  max-width:55%;
+  word-wrap:break-word;
+}
+
+/* FOOTER */
+.card-footer {
+  text-align:center;
+  padding:15px;
+  font-size:12px;
+  color:#777;
+}
+
+/* STATUS */
+.status {
+  text-align:center;
+  margin-top:10px;
+  font-size:13px;
+  color:#00c853;
+  font-weight:600;
+}
+
+/* MOBILE OPTIMIZATION */
+@media(max-width:400px){
+  .info {
+    flex-direction:column;
+    gap:3px;
+  }
+
+  .info span:last-child {
+    text-align:left;
+  }
 }
 </style>
 </head>
@@ -244,24 +311,36 @@ body {
 <body>
 
 <div class="card">
-<div class="badge">✔ Verified</div>
-<div class="title">Student Pass</div>
- <div class ="info"><strong>Name:</strong> ${u.full_name}</div>
-        <div class ="info"><strong>Email:</strong> ${u.email}</div>
-        <div class ="info"><strong>Phone:</strong> ${u.phone}</div>
-        <div class ="info"><strong>Address:</strong> ${u.address}</div>
-        <div class ="info"><strong>Date of Birth:</strong> ${u.dob}</div>
-        <div class ="info"><strong>Trading Market:</strong> ${u.trading_market}</div>
-        <div class ="info"><strong>Trading Type:</strong> ${u.trading_type}</div>
-        <div class ="info"><strong>Source:</strong> ${u.source}</div>
-        <div class ="info"><strong>Software Used:</strong> ${u.software_used}</div>
-        <div class ="info"><strong>Previous Course:</strong> ${u.previous_course}</div>
-        <div class ="info"><strong>Level:</strong> ${u.level}</div>
-        <div class ="info"><strong>Amount Paid:</strong> ${u.amount}</div>
-        <div class ="info"><strong>Payment Mode:</strong> ${u.payment_mode}</div>
-<hr>
-<p style="text-align:center;font-size:12px;">Scan QR / Barcode again</p>
+
+  <div class="card-header">
+    <h2>🎟 Student Entry Pass</h2>
+    <div class="badge">✔ VERIFIED</div>
+  </div>
+
+  <div class="card-body">
+
+    <div class="info"><span>Name</span><span>${u.full_name}</span></div>
+    <div class="info"><span>Email</span><span>${u.email}</span></div>
+    <div class="info"><span>Phone</span><span>${u.phone}</span></div>
+    <div class="info"><span>DOB</span><span>${u.dob}</span></div>
+    <div class="info"><span>Market</span><span>${u.trading_market}</span></div>
+    <div class="info"><span>Type</span><span>${u.trading_type}</span></div>
+    <div class="info"><span>Source</span><span>${u.source}</span></div>
+    <div class="info"><span>Software</span><span>${u.software_used}</span></div>
+    <div class="info"><span>Level</span><span>${u.level}</span></div>
+    <div class="info"><span>Paid</span><span>₹ ${u.amount}</span></div>
+    <div class="info"><span>Mode</span><span>${u.payment_mode}</span></div>
+
+    <div class="status">✔ Valid Entry Approved</div>
+
+  </div>
+
+  <div class="card-footer">
+    Scan QR / Barcode at Entry Gate
+  </div>
+
 </div>
+
 </body>
 </html>
 `);
