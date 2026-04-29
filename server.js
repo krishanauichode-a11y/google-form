@@ -151,28 +151,26 @@ app.post("/share-interakt", async (req, res) => {
     const phoneNumber = phone.replace("+91", "").replace("+", "");
 
     // ✅ Interakt API
-    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-      },
-      body: JSON.stringify({
-        countryCode: "+91",
-        phoneNumber: phoneNumber,
-        type: "Image",
-        data: {
-          image: {
-            url: finalImageUrl,
-            caption: `🎟️ Entry Pass
+  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+  },
+  body: JSON.stringify({
+    countryCode: "+91",
+    phoneNumber: cleanPhone,
+    type: "Image",
+    data: {
+      image: {
+        url: finalImageUrl,
+        caption: `🎟️ Entry Pass
 Name: ${user.full_name}
-Course: ${user.trading_market}
-Amount: ₹${user.amount}
-Scan QR or Barcode at entry`
-          }
-        }
-      })
-    });
+Scan QR or barcode at entry`
+      }
+    }
+  })
+});
 
     const data = await response.json();
     console.log("📱 Interakt Response:", data);
@@ -212,12 +210,24 @@ app.get("/user/:id", async (req, res) => {
 
     const u = result.rows[0];
 
-    res.send(`
-      <div style="text-align:center;font-family:sans-serif">
+   res.send(`
+      <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
         <h2>✅ Verified Student</h2>
-        <p><strong>Name:</strong> ${u.full_name}</p>
-        <p><strong>Email:</strong> ${u.email}</p>
-        <p><strong>Phone:</strong> ${u.phone}</p>
+        <p><strong>Name:</strong> ${user.full_name}</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Phone:</strong> ${user.phone}</p>
+        <p><strong>Address:</strong> ${user.address}</p>
+        <p><strong>Date of Birth:</strong> ${user.dob}</p>
+        <p><strong>Trading Market:</strong> ${user.trading_market}</p>
+        <p><strong>Trading Type:</strong> ${user.trading_type}</p>
+        <p><strong>Source:</strong> ${user.source}</p>
+        <p><strong>Software Used:</strong> ${user.software_used}</p>
+        <p><strong>Previous Course:</strong> ${user.previous_course}</p>
+        <p><strong>Level:</strong> ${user.level}</p>
+        <p><strong>Amount Paid:</strong> ${user.amount}</p>
+        <p><strong>Payment Mode:</strong> ${user.payment_mode}</p>
+        <hr>
+        <p><small>Scan this QR/Barcode again to reload</small></p>
       </div>
     `);
 
