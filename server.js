@@ -30,7 +30,6 @@ const pool = new Pool({
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
 app.use("/temp", express.static(tempDir));
 
 // ==============================
@@ -44,11 +43,8 @@ app.get("/", (req, res) => {
 // 🎟️ GENERATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
-  const qrPath = path.join(tempDir, `${id}-qr.png`);
-  const barcodePath = path.join(tempDir, `${id}-barcode.png`);
-
-  const qr = await loadImage(qrPath);
-  const barcode = await loadImage(barcodePath);
+  const qr = await loadImage(path.join(tempDir, `${id}-qr.png`));
+  const barcode = await loadImage(path.join(tempDir, `${id}-barcode.png`));
 
   const canvas = createCanvas(700, 900);
   const ctx = canvas.getContext("2d");
@@ -61,10 +57,10 @@ async function generateFinalImage(id) {
   ctx.fillText("ENTRY PASS", 220, 60);
 
   ctx.drawImage(qr, 200, 120, 300, 300);
-  ctx.drawImage(barcode, 100, 480, 500, 150);
+  ctx.drawImage(barcode, 50, 480, 600, 180); // bigger barcode
 
   ctx.font = "20px Arial";
-  ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
+  ctx.fillText("Scan QR or Barcode", 200, 750);
 
   const finalPath = path.join(tempDir, `${id}-final.png`);
   fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
@@ -104,24 +100,25 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // QR
+    // QR → full URL
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // Barcode
+    // Barcode → SHORT URL (fix scanning)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: url,
-      scale: 5,
-      height: 20,
-      includetext: true
+      scale: 3,
+      height: 15,
+      includetext: false,
+      padding: 10
     });
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
 
   } catch (err) {
-    console.error("❌ CREATE ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -133,12 +130,7 @@ app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
-    // ✅ DEFINE HERE (IMPORTANT)
-    const cleanPhone = phone
-      .replace(/\D/g, "")
-      .slice(-10);
-
-    console.log("📱 Clean Phone:", cleanPhone);
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
 
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
@@ -150,35 +142,35 @@ app.post("/share-interakt", async (req, res) => {
     const finalImageUrl = await generateFinalImage(id);
 
     const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-  },
-  body: JSON.stringify({
-    countryCode: "+91",
-    phoneNumber: cleanPhone,
-    type: "Image",
-    data: {
-      mediaUrl: finalImageUrl,
-      caption: `🎟️ Entry Pass
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+      },
+      body: JSON.stringify({
+        countryCode: "+91",
+        phoneNumber: cleanPhone,
+        type: "Image",
+        data: {
+          mediaUrl: finalImageUrl,
+          caption: `🎟️ Entry Pass
 Name: ${user.full_name}
-Scan QR or barcode at entry`
-    }
-  })
-});
+Scan QR or Barcode at entry`
+        }
+      })
+    });
 
     const data = await response.json();
     res.json({ success: true, data });
 
   } catch (err) {
-    console.error("❌ Interakt Error:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 👤 USER PAGE
+// 👤 USER PAGE (PRO UI)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -194,36 +186,91 @@ app.get("/user/:id", async (req, res) => {
     const u = result.rows[0];
 
     res.send(`
-      <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
-        <h2>✅ Verified Student</h2>
-        <p><strong>Name:</strong> ${u.full_name}</p>
-        <p><strong>Email:</strong> ${u.email}</p>
-        <p><strong>Phone:</strong> ${u.phone}</p>
-        <p><strong>Address:</strong> ${u.address}</p>
-        <p><strong>Date of Birth:</strong> ${u.dob}</p>
-        <p><strong>Trading Market:</strong> ${u.trading_market}</p>
-        <p><strong>Trading Type:</strong> ${u.trading_type}</p>
-        <p><strong>Source:</strong> ${u.source}</p>
-        <p><strong>Software Used:</strong> ${u.software_used}</p>
-        <p><strong>Previous Course:</strong> ${u.previous_course}</p>
-        <p><strong>Level:</strong> ${u.level}</p>
-        <p><strong>Amount Paid:</strong> ${u.amount}</p>
-        <p><strong>Payment Mode:</strong> ${u.payment_mode}</p>
-        <hr>
-        <p><small>Scan this QR/Barcode again to reload</small></p>
-      </div>
-    `);
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verified Student</title>
 
+<style>
+body {
+  margin:0;
+  font-family:sans-serif;
+  background:linear-gradient(135deg,#1e3c72,#2a5298);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+
+.card {
+  background:#fff;
+  width:90%;
+  max-width:400px;
+  padding:20px;
+  border-radius:15px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.3);
+}
+
+.title {
+  text-align:center;
+  font-size:22px;
+  color:green;
+  margin-bottom:10px;
+}
+
+.info {
+  margin:8px 0;
+  font-size:14px;
+}
+
+.info strong {
+  width:130px;
+  display:inline-block;
+}
+
+.badge {
+  text-align:center;
+  background:green;
+  color:#fff;
+  padding:5px;
+  border-radius:20px;
+  margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<div class="badge">✔ Verified</div>
+<div class="title">Student Pass</div>
+
+<div class="info"><strong>Name:</strong> ${u.full_name}</div>
+<div class="info"><strong>Email:</strong> ${u.email}</div>
+<div class="info"><strong>Phone:</strong> ${u.phone}</div>
+<div class="info"><strong>Course:</strong> ${u.trading_market}</div>
+<div class="info"><strong>Type:</strong> ${u.trading_type}</div>
+<div class="info"><strong>Amount:</strong> ₹${u.amount}</div>
+
+<hr>
+
+<p style="text-align:center;font-size:12px;">Scan QR / Barcode again</p>
+</div>
+
+</body>
+</html>
+`);
   } catch (err) {
-    console.error(err); // 👈 add this for debugging
+    console.error(err);
     res.send("Error loading user");
   }
 });
+
 // ==============================
-// 🚀 START SERVER
+// 🚀 START
 // ==============================
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
 });
