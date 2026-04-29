@@ -20,6 +20,7 @@
     "uuid": "^14.0.0",
      "@googleapis/drive": "^20.1.0",
     "axios": "^1.15.2",
-     "canvas": "^3.2.3"
+     "canvas": "^3.2.3",
+    "node-fetch": "^2.7.0"
   }
 }
