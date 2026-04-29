@@ -6,13 +6,15 @@ const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const fetch = require("node-fetch");
+const { createCanvas, loadImage } = require("canvas");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
 // ==============================
-// ✅ SUPABASE DATABASE (FIXED)
+// ✅ DATABASE
 // ==============================
 const pool = new Pool({
   user: "postgres.ufbttlxvzuchacptqkee",
@@ -24,37 +26,72 @@ const pool = new Pool({
 });
 
 // ==============================
-// ✅ SERVE GENERATED FILES
+// ✅ TEMP FOLDER SETUP
 // ==============================
-app.use("/temp", express.static(path.join(__dirname, "temp")));
+const tempDir = path.join(__dirname, "temp");
+
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir);
+}
+
+// Serve temp files
+app.use("/temp", express.static(tempDir));
 
 // ==============================
-// ✅ TEST ROUTE
+// 🏠 HOME
 // ==============================
 app.get("/", (req, res) => {
   res.send("✅ Server Running");
 });
 
 // ==============================
-// ✅ CREATE USER (WITH QR & BARCODE)
+// 🎟️ GENERATE FINAL IMAGE
+// ==============================
+async function generateFinalImage(id) {
+  const qrPath = path.join(tempDir, `${id}-qr.png`);
+  const barcodePath = path.join(tempDir, `${id}-barcode.png`);
+
+  const qr = await loadImage(qrPath);
+  const barcode = await loadImage(barcodePath);
+
+  const canvas = createCanvas(700, 900);
+  const ctx = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, 700, 900);
+
+  // Title
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 34px Arial";
+  ctx.fillText("ENTRY PASS", 230, 60);
+
+  // QR
+  ctx.drawImage(qr, 200, 120, 300, 300);
+
+  // Barcode
+  ctx.drawImage(barcode, 100, 480, 500, 150);
+
+  // Footer
+  ctx.font = "20px Arial";
+  ctx.fillText("Scan QR or Barcode at Entry", 170, 750);
+
+  const finalPath = path.join(tempDir, `${id}-final.png`);
+  fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
+
+  return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
+}
+
+// ==============================
+// 👤 CREATE USER + QR + BARCODE
 // ==============================
 app.post("/create", async (req, res) => {
   try {
     const {
-      fullName,
-      address,
-      email,
-      phone,
-      dob,
-      date,
-      tradingMarket,
-      tradingType,
-      source,
-      softwareUsed,
-      previousCourse,
-      level,
-      amount,
-      paymentMode
+      fullName, address, email, phone, dob, date,
+      tradingMarket, tradingType, source,
+      softwareUsed, previousCourse, level,
+      amount, paymentMode
     } = req.body;
 
     const id = uuidv4();
@@ -77,43 +114,24 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // Generate QR Code as buffer
+    // QR
     const qrBuffer = await QRCode.toBuffer(url);
-    const qrPath = path.join(__dirname, "temp", `${id}-qr.png`);
-    
-    if (!fs.existsSync(path.join(__dirname, "temp"))) {
-      fs.mkdirSync(path.join(__dirname, "temp"));
-    }
+    fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    fs.writeFileSync(qrPath, qrBuffer);
-
-    // Generate Barcode (NARROW & MACHINE-SCANNABLE)
+    // Barcode
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: url, // Full URL
-      scale: 0.8,  // Reduced scale for narrower bars
-      width: 1,    // Explicitly set narrow width
-      height: 10,  // Shorter height
-      includetext: false, // Remove text to save space
-      textxalign: "center",
-      padding: 1,  // Minimal padding
-      backgroundcolor: "ffffff",
-      barcolor: "000000",
-      guardwhitespace: false, // Remove extra whitespace
-      parsealt: true, // Enable parsing for better machine readability
+      text: url,
+      scale: 5,
+      height: 20,
+      includetext: true
     });
-
-    const barcodePath = path.join(__dirname, "temp", `${id}-barcode.png`);
-    fs.writeFileSync(barcodePath, barcodeBuffer);
+    fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({
       success: true,
       id,
-      url,
-      qr: qrBuffer.toString("base64"),
-      barcode: barcodeBuffer.toString("base64"),
-      qrPath,
-      barcodePath
+      url
     });
 
   } catch (err) {
@@ -123,53 +141,48 @@ app.post("/create", async (req, res) => {
 });
 
 // ==============================
-// ✅ SHARE VIA INTERAKT
+// 📲 SEND WHATSAPP + CLEANUP
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
-    const qrUrl = `https://google-form-kebh.onrender.com/temp/${id}-qr.png`;
-    const barcodeUrl = `https://google-form-kebh.onrender.com/temp/${id}-barcode.png`;
+    const finalImageUrl = await generateFinalImage(id);
 
-    const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
+    const phoneNumber = phone.replace("+91", "").replace("+", "");
 
-    const interaktApiUrl = "https://api.interakt.io/v1";
-    const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
-
-    // Send QR Code
-    const qrResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
+    const response = await fetch("https://api.interakt.io/v1/public/message/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
+        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
       },
       body: JSON.stringify({
-        phoneNumber: interaktNumber,
-        message: "Your QR Code:",
-        mediaUrl: qrUrl
+        countryCode: "+91",
+        phoneNumber: phoneNumber,
+        type: "Media",
+        media: {
+          url: finalImageUrl,
+          caption: "🎟️ Your Entry Pass\nScan QR or Barcode at entry"
+        }
       })
     });
 
-    // Send Barcode
-    const barcodeResponse = await fetch(`${interaktApiUrl}/whatsapp/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${interaktApiKey}`
-      },
-      body: JSON.stringify({
-        phoneNumber: interaktNumber,
-        message: "Your Barcode:",
-        mediaUrl: barcodeUrl
-      })
-    });
+    const data = await response.json();
 
-    res.json({
-      success: true,
-      qrSent: qrResponse.ok,
-      barcodeSent: barcodeResponse.ok
-    });
+    // 🧹 AUTO DELETE AFTER 1 MIN
+    setTimeout(() => {
+      try {
+        fs.unlinkSync(path.join(tempDir, `${id}-qr.png`));
+        fs.unlinkSync(path.join(tempDir, `${id}-barcode.png`));
+        fs.unlinkSync(path.join(tempDir, `${id}-final.png`));
+        console.log("🧹 Temp files deleted");
+      } catch (err) {
+        console.log("Cleanup error:", err.message);
+      }
+    }, 60000);
+
+    res.json({ success: true, data });
 
   } catch (err) {
     console.error("❌ Interakt Error:", err);
@@ -178,22 +191,20 @@ app.post("/share-interakt", async (req, res) => {
 });
 
 // ==============================
-// ✅ USER PAGE (DISPLAYS USER DETAILS)
+// 👤 USER PAGE
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
-    const { id } = req.params;
-
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
-      [id]
+      [req.params.id]
     );
 
     if (result.rows.length === 0) {
-      return res.send("<h2>❌ Invalid QR Code</h2>");
+      return res.send("<h2>❌ Invalid QR</h2>");
     }
 
-    const user = result.rows[0];
+    const u = result.rows[0];
 
     res.send(`
       <div style="text-align:center; font-family:sans-serif; padding:20px; max-width:600px; margin:0 auto;">
@@ -217,13 +228,12 @@ app.get("/user/:id", async (req, res) => {
     `);
 
   } catch (err) {
-    console.error(err);
     res.send("Error loading user");
   }
 });
 
 // ==============================
-// 🚀 START SERVER (FIXED FOR RENDER)
+// 🚀 START SERVER
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
