@@ -36,7 +36,7 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// ✅ CREATE USER (WITH QR & SMALL MACHINE-SCANNABLE BARCODE)
+// ✅ CREATE USER (WITH QR & BARCODE)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -87,19 +87,17 @@ app.post("/create", async (req, res) => {
 
     fs.writeFileSync(qrPath, qrBuffer);
 
-    // Generate Barcode (SMALL & MACHINE-SCANNABLE)
+    // Generate Barcode (FIXED - with full URL)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: url, // Full URL for redirect
-      scale: 1,  // Smaller scale
-      height: 10, // Shorter height
-      includetext: false, // No text (saves space)
+      text: url, // Full URL instead of just UUID
+      scale: 5,
+      height: 20,
+      includetext: true,
       textxalign: "center",
-      padding: 2, // Minimal padding
+      padding: 10,
       backgroundcolor: "ffffff",
-      barcolor: "000000",
-      guardwhitespace: false, // Remove extra whitespace
-      parsealt: true, // Better machine readability
+      barcolor: "000000"
     });
 
     const barcodePath = path.join(__dirname, "temp", `${id}-barcode.png`);
