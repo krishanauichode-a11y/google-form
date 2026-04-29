@@ -8,7 +8,6 @@ const fs = require("fs");
 const path = require("path");
 const fetch = require("node-fetch");
 const { createCanvas, loadImage } = require("canvas");
-const fetch = require("node-fetch");
 
 const app = express();
 app.use(express.json());
