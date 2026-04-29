@@ -24,6 +24,11 @@ const pool = new Pool({
 });
 
 // ==============================
+// ✅ SERVE GENERATED FILES
+// ==============================
+app.use("/temp", express.static(path.join(__dirname, "temp")));
+
+// ==============================
 // ✅ TEST ROUTE
 // ==============================
 app.get("/", (req, res) => {
@@ -74,37 +79,38 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // Generate QR Code
-    const qr = await QRCode.toDataURL(url);
-
-    // Generate Barcode (smaller and scannable)
-    const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: id.substring(0, 12),
-      scale: 2,
-      height: 5,
-      includetext: false,
-      textxalign: "center",
-    });
-
-    // Save QR and Barcode to temporary files
+    // Generate QR Code as buffer
+    const qrBuffer = await QRCode.toBuffer(url);
     const qrPath = path.join(__dirname, "temp", `${id}-qr.png`);
-    const barcodePath = path.join(__dirname, "temp", `${id}-barcode.png`);
-
+    
     // Ensure temp directory exists
     if (!fs.existsSync(path.join(__dirname, "temp"))) {
       fs.mkdirSync(path.join(__dirname, "temp"));
     }
 
-    // Save files
-    fs.writeFileSync(qrPath, qr.split(",")[1], "base64");
-    fs.writeFileSync(barcodePath, barcodeBuffer, "base64");
+    fs.writeFileSync(qrPath, qrBuffer);
+
+    // Generate Barcode (FIXED)
+    const barcodeBuffer = await bwipjs.toBuffer({
+      bcid: "code128",
+      text: id,
+      scale: 5,
+      height: 20,
+      includetext: true,
+      textxalign: "center",
+      padding: 10,
+      backgroundcolor: "ffffff",
+      barcolor: "000000"
+    });
+
+    const barcodePath = path.join(__dirname, "temp", `${id}-barcode.png`);
+    fs.writeFileSync(barcodePath, barcodeBuffer);
 
     res.json({
       success: true,
       id,
       url,
-      qr,
+      qr: qrBuffer.toString("base64"),
       barcode: barcodeBuffer.toString("base64"),
       qrPath,
       barcodePath
@@ -121,7 +127,11 @@ app.post("/create", async (req, res) => {
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
-    const { phone, qrPath, barcodePath } = req.body;
+    const { id, phone } = req.body;
+
+    // Construct valid URLs using your domain
+    const qrUrl = `https://google-form-kebh.onrender.com/temp/${id}-qr.png`;
+    const barcodeUrl = `https://google-form-kebh.onrender.com/temp/${id}-barcode.png`;
 
     // Convert phone to international format
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
@@ -140,7 +150,7 @@ app.post("/share-interakt", async (req, res) => {
       body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your QR Code:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your QR URL
+        mediaUrl: qrUrl // Use actual URL
       })
     });
 
@@ -154,7 +164,7 @@ app.post("/share-interakt", async (req, res) => {
       body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your Barcode:",
-        mediaUrl: `https://drive.google.com/uc/${uuidv4()}` // Replace with your barcode URL
+        mediaUrl: barcodeUrl // Use actual URL
       })
     });
 
