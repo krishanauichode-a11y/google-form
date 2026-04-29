@@ -105,14 +105,15 @@ app.post("/create", async (req, res) => {
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
     // Barcode → SHORT URL (fix scanning)
-    const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: url,
-      scale: 3,
-      height: 15,
-      includetext: false,
-      padding: 10
-    });
+  const barcodeBuffer = await bwipjs.toBuffer({
+  bcid: "code128",
+  text: id,              // ✅ ONLY ID (important)
+  scale: 3,              // not too dense
+  height: 18,            // taller = better scanning
+  includetext: true,     // shows ID below barcode
+  textxalign: "center",
+  padding: 10
+});
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
@@ -245,19 +246,22 @@ body {
 <div class="card">
 <div class="badge">✔ Verified</div>
 <div class="title">Student Pass</div>
-
-<div class="info"><strong>Name:</strong> ${u.full_name}</div>
-<div class="info"><strong>Email:</strong> ${u.email}</div>
-<div class="info"><strong>Phone:</strong> ${u.phone}</div>
-<div class="info"><strong>Course:</strong> ${u.trading_market}</div>
-<div class="info"><strong>Type:</strong> ${u.trading_type}</div>
-<div class="info"><strong>Amount:</strong> ₹${u.amount}</div>
-
+ <div class ="info"><strong>Name:</strong> ${user.full_name}</div>
+        <div class ="info"><strong>Email:</strong> ${user.email}</div>
+        <div class ="info"><strong>Phone:</strong> ${user.phone}</div>
+        <div class ="info"><strong>Address:</strong> ${user.address}</div>
+        <div class ="info"><strong>Date of Birth:</strong> ${user.dob}</div>
+        <div class ="info"><strong>Trading Market:</strong> ${user.trading_market}</div>
+        <div class ="info"><strong>Trading Type:</strong> ${user.trading_type}</div>
+        <div class ="info"><strong>Source:</strong> ${user.source}</div>
+        <div class ="info"><strong>Software Used:</strong> ${user.software_used}</div>
+        <div class ="info"><strong>Previous Course:</strong> ${user.previous_course}</div>
+        <div class ="info"><strong>Level:</strong> ${user.level}</div>
+        <div class ="info"><strong>Amount Paid:</strong> ${user.amount}</div>
+        <div class ="info"><strong>Payment Mode:</strong> ${user.payment_mode}</div>
 <hr>
-
 <p style="text-align:center;font-size:12px;">Scan QR / Barcode again</p>
 </div>
-
 </body>
 </html>
 `);
