@@ -57,8 +57,6 @@ app.post("/create", async (req, res) => {
       paymentMode
     } = req.body;
 
-    console.log("📩 Incoming Data:", req.body);
-
     const id = uuidv4();
 
     await pool.query(
@@ -83,17 +81,16 @@ app.post("/create", async (req, res) => {
     const qrBuffer = await QRCode.toBuffer(url);
     const qrPath = path.join(__dirname, "temp", `${id}-qr.png`);
     
-    // Ensure temp directory exists
     if (!fs.existsSync(path.join(__dirname, "temp"))) {
       fs.mkdirSync(path.join(__dirname, "temp"));
     }
 
     fs.writeFileSync(qrPath, qrBuffer);
 
-    // Generate Barcode (FIXED)
+    // Generate Barcode (FIXED - with full URL)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: id,
+      text: url, // Full URL instead of just UUID
       scale: 5,
       height: 20,
       includetext: true,
@@ -129,14 +126,11 @@ app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
-    // Construct valid URLs using your domain
     const qrUrl = `https://google-form-kebh.onrender.com/temp/${id}-qr.png`;
     const barcodeUrl = `https://google-form-kebh.onrender.com/temp/${id}-barcode.png`;
 
-    // Convert phone to international format
     const interaktNumber = phone.startsWith("+") ? phone : `+91${phone}`;
 
-    // Interakt API Configuration (replace with your actual credentials)
     const interaktApiUrl = "https://api.interakt.io/v1";
     const interaktApiKey = "ODRvSkhXcG9HcXYtTkRFODlrZ0NBa0lBeERxRFFJX2ZlWEItbE5ucjFQWTo=";
 
@@ -150,7 +144,7 @@ app.post("/share-interakt", async (req, res) => {
       body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your QR Code:",
-        mediaUrl: qrUrl // Use actual URL
+        mediaUrl: qrUrl
       })
     });
 
@@ -164,13 +158,9 @@ app.post("/share-interakt", async (req, res) => {
       body: JSON.stringify({
         phoneNumber: interaktNumber,
         message: "Your Barcode:",
-        mediaUrl: barcodeUrl // Use actual URL
+        mediaUrl: barcodeUrl
       })
     });
-
-    // Log results
-    console.log("📱 QR Sent:", qrResponse.ok);
-    console.log("📱 Barcode Sent:", barcodeResponse.ok);
 
     res.json({
       success: true,
