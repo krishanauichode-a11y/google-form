@@ -126,6 +126,8 @@ app.post("/create", async (req, res) => {
   }
 });
 
+console.log("Original Phone:", phone);
+console.log("Clean Phone:", cleanPhone);
 // ==============================
 // 📲 SHARE INTERAKT
 // ==============================
@@ -133,59 +135,44 @@ app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
-    // ✅ Get user
+    // ✅ DEFINE HERE (IMPORTANT)
+    const cleanPhone = phone
+      .replace(/\D/g, "")
+      .slice(-10);
+
+    console.log("📱 Clean Phone:", cleanPhone);
+
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
       [id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
     const user = result.rows[0];
 
-    // Generate image
     const finalImageUrl = await generateFinalImage(id);
 
-    const phoneNumber = phone.replace("+91", "").replace("+", "");
-
-    // ✅ Interakt API
-  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-  },
-  body: JSON.stringify({
-    countryCode: "+91",
-    phoneNumber: cleanPhone,
-    type: "Image",
-    data: {
-      image: {
-        url: finalImageUrl,
-        caption: `🎟️ Entry Pass
+    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+      },
+      body: JSON.stringify({
+        countryCode: "+91",
+        phoneNumber: cleanPhone, // ✅ NOW WORKS
+        type: "Image",
+        data: {
+          image: {
+            url: finalImageUrl,
+            caption: `🎟️ Entry Pass
 Name: ${user.full_name}
 Scan QR or barcode at entry`
-      }
-    }
-  })
-});
+          }
+        }
+      })
+    });
 
     const data = await response.json();
-    console.log("📱 Interakt Response:", data);
-
-    // 🧹 Cleanup
-    setTimeout(() => {
-      try {
-        fs.unlinkSync(path.join(tempDir, `${id}-qr.png`));
-        fs.unlinkSync(path.join(tempDir, `${id}-barcode.png`));
-        fs.unlinkSync(path.join(tempDir, `${id}-final.png`));
-      } catch (err) {
-        console.log("Cleanup error:", err.message);
-      }
-    }, 60000);
-
     res.json({ success: true, data });
 
   } catch (err) {
