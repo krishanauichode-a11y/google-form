@@ -150,25 +150,23 @@ app.post("/share-interakt", async (req, res) => {
     const finalImageUrl = await generateFinalImage(id);
 
     const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-      },
-      body: JSON.stringify({
-        countryCode: "+91",
-        phoneNumber: cleanPhone, // ✅ NOW WORKS
-        type: "Image",
-        data: {
-          image: {
-            url: finalImageUrl,
-            caption: `🎟️ Entry Pass
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+  },
+  body: JSON.stringify({
+    countryCode: "+91",
+    phoneNumber: cleanPhone,
+    type: "Image",
+    data: {
+      mediaUrl: finalImageUrl,
+      caption: `🎟️ Entry Pass
 Name: ${user.full_name}
 Scan QR or barcode at entry`
-          }
-        }
-      })
-    });
+    }
+  })
+});
 
     const data = await response.json();
     res.json({ success: true, data });
