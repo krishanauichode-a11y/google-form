@@ -126,8 +126,6 @@ app.post("/create", async (req, res) => {
   }
 });
 
-console.log("Original Phone:", phone);
-console.log("Clean Phone:", cleanPhone);
 // ==============================
 // 📲 SHARE INTERAKT
 // ==============================
