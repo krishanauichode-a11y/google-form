@@ -8,20 +8,13 @@ const fs = require("fs");
 const path = require("path");
 const fetch = require("node-fetch");
 const { createCanvas, loadImage } = require("canvas");
-const jwt = require("jsonwebtoken");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
 // ==============================
-// 🔐 CONFIG
-// ==============================
-const JWT_SECRET = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
-const ADMIN_PASSWORD = "entrypass2026"; // password user enters
-
-// ==============================
-// 🗄️ DATABASE
+// ✅ DATABASE
 // ==============================
 const pool = new Pool({
   user: "postgres.ufbttlxvzuchacptqkee",
@@ -33,7 +26,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// 📁 TEMP FOLDER
+// ✅ TEMP STORAGE
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -43,7 +36,7 @@ app.use("/temp", express.static(tempDir));
 // 🏠 HOME
 // ==============================
 app.get("/", (req, res) => {
-  res.send("✅ Server Running (Password Protected QR)");
+  res.send("✅ Server Running");
 });
 
 // ==============================
@@ -60,14 +53,16 @@ async function generateFinalImage(id) {
   ctx.fillRect(0, 0, 700, 900);
 
   ctx.fillStyle = "#000";
-  ctx.font = "bold 34px Arial";
+  ctx.font = "bold 32px Arial";
   ctx.fillText("ENTRY PASS", 220, 60);
 
   ctx.drawImage(qr, 200, 120, 300, 300);
+
+  // 🔥 Bigger barcode = better scan
   ctx.drawImage(barcode, 50, 480, 600, 180);
 
-  ctx.font = "20px Arial";
-  ctx.fillText("Scan at Entry", 250, 750);
+  ctx.font = "18px Arial";
+  ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
 
   const finalPath = path.join(tempDir, `${id}-final.png`);
   fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
@@ -76,7 +71,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER + QR
+// 👤 CREATE USER
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -105,117 +100,112 @@ app.post("/create", async (req, res) => {
       ]
     );
 
-    // 🔐 TOKEN
-    const token = jwt.sign({ id }, JWT_SECRET);
+    const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    const url = `https://google-form-kebh.onrender.com/user/${token}`;
-
-    // QR
+    // QR → URL
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // BARCODE
+    // Barcode → ID only (SCANNABLE)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
       scale: 3,
-      height: 18,
-      includetext: true
+      height: 20,
+      includetext: true,
+      textxalign: "center",
+      padding: 10
     });
-
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
 
   } catch (err) {
+    console.error("❌ CREATE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 🔐 STEP 1: PASSWORD PAGE
+// 📲 SHARE INTERAKT TEMPLATE
 // ==============================
-app.get("/user/:token", (req, res) => {
-  const token = req.params.token;
-
-  res.send(`
-  <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <style>
-      body {
-        font-family: Arial;
-        text-align:center;
-        margin-top:100px;
-        background:#f4f4f4;
-      }
-      input {
-        padding:10px;
-        width:200px;
-        border-radius:5px;
-        border:1px solid #ccc;
-      }
-      button {
-        padding:10px 20px;
-        margin-top:10px;
-        background:#00c853;
-        color:#fff;
-        border:none;
-        border-radius:5px;
-      }
-    </style>
-  </head>
-  <body>
-
-    <h2>🔐 Enter Access Password</h2>
-
-    <input type="password" id="pwd" placeholder="Enter password"/><br>
-    <button onclick="go()">Submit</button>
-
-    <script>
-      function go(){
-        const pwd = document.getElementById("pwd").value;
-        window.location.href = "/verify/${token}?key=" + pwd;
-      }
-    </script>
-
-  </body>
-  </html>
-  `);
-});
-
-// ==============================
-// 🔐 STEP 2: VERIFY PASSWORD + SHOW DATA
-// ==============================
-app.get("/verify/:token", async (req, res) => {
+app.post("/share-interakt", async (req, res) => {
   try {
-    const token = req.params.token;
-    const key = req.query.key;
+    const { id, phone } = req.body;
 
-    if (key !== ADMIN_PASSWORD) {
-      return res.send("<h2>❌ Wrong Password</h2>");
-    }
+    // ✅ Clean phone
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
 
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (err) {
-      return res.send("<h2>❌ QR Expired</h2>");
-    }
+    console.log("📱 Phone:", cleanPhone);
 
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
-      [decoded.id]
+      [id]
     );
 
     if (result.rows.length === 0) {
-      return res.send("<h2>❌ User Not Found</h2>");
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    const user = result.rows[0];
+
+    const finalImageUrl = await generateFinalImage(id);
+
+    console.log("🖼️ Image URL:", finalImageUrl);
+
+  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+  },
+  body: JSON.stringify({
+    countryCode: "+91",
+    phoneNumber: cleanPhone,
+    type: "Template",
+    template: {
+      name: "entry_pass",
+      languageCode: "en", // ✅ FIXED
+      bodyValues: [
+        String(user.full_name || "User"),
+        "Scan QR or Barcode at entry"
+      ],
+      headerValues: [
+        finalImageUrl // ✅ must be public URL
+      ]
+    }
+  })
+});
+
+    const data = await response.json();
+    console.log("📱 Interakt Response:", data);
+
+    res.json({ success: true, data });
+
+  } catch (err) {
+    console.error("❌ Interakt Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================
+// 👤 USER PAGE (RESPONSIVE)
+// ==============================
+app.get("/user/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.send("<h2>❌ Invalid QR</h2>");
     }
 
     const u = result.rows[0];
 
     res.send(`
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -374,43 +364,8 @@ body {
     `);
 
   } catch (err) {
-    res.send("Server Error");
-  }
-});
-
-// ==============================
-// 📲 SHARE INTERAKT
-// ==============================
-app.post("/share-interakt", async (req, res) => {
-  try {
-    const { id, phone } = req.body;
-
-    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-
-    const finalImageUrl = await generateFinalImage(id);
-
-    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-      },
-      body: JSON.stringify({
-        countryCode: "+91",
-        phoneNumber: cleanPhone,
-        type: "Image",
-        data: {
-          mediaUrl: finalImageUrl,
-          caption: `🎟️ Entry Pass\nScan QR & enter password`
-        }
-      })
-    });
-
-    const data = await response.json();
-    res.json({ success: true, data });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.send("Error loading user");
   }
 });
 
