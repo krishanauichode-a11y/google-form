@@ -33,37 +33,39 @@ const pool = new Pool({
 // ==============================
 // 📁 TEMP STORAGE
 // ==============================
-const tempDir = path.join(__dirname, "temp");
-if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-app.use("/temp", express.static(tempDir));
-
-// ==============================
-// 🏠 HOME
-// ==============================
-app.get("/", (req, res) => {
-  res.send("✅ Server Running (Password Protected QR)");
-});
-
-// ==============================
-// 🎟️ GENERATE FINAL IMAGE
-// ==============================
 async function generateFinalImage(id) {
   const qr = await loadImage(path.join(tempDir, `${id}-qr.png`));
   const barcode = await loadImage(path.join(tempDir, `${id}-barcode.png`));
 
+  // 👉 Load your logo (put logo.png inside /temp or /assets folder)
+  const logo = await loadImage(path.join(__dirname, "logo.png"));
+
   const canvas = createCanvas(700, 900);
   const ctx = canvas.getContext("2d");
 
+  // Background
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, 700, 900);
 
+  // 👉 Draw Logo (top-left)
+  ctx.drawImage(logo, 30, 20, 80, 80);
+
+  // 👉 Office Name (next to logo)
   ctx.fillStyle = "#000";
+  ctx.font = "bold 26px Arial";
+  ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
+
+  // Title
   ctx.font = "bold 32px Arial";
-  ctx.fillText("ENTRY PASS", 220, 60);
+  ctx.fillText("ENTRY PASS", 230, 120);
 
-  ctx.drawImage(qr, 200, 120, 300, 300);
-  ctx.drawImage(barcode, 50, 480, 600, 180);
+  // QR Code
+  ctx.drawImage(qr, 200, 160, 300, 300);
 
+  // Barcode (bigger for scan)
+  ctx.drawImage(barcode, 50, 500, 600, 180);
+
+  // Footer text
   ctx.font = "18px Arial";
   ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
 
