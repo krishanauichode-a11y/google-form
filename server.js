@@ -53,9 +53,6 @@ async function generateFinalImage(id) {
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, 700, 900);
 
-  // 👉 Draw Logo (top-left)
-  ctx.drawImage(logo, 30, 20, 80, 80);
-
   // 👉 Office Name (next to logo)
   ctx.fillStyle = "#000";
   ctx.font = "bold 28px Arial";
