@@ -164,7 +164,7 @@ app.post("/share-interakt", async (req, res) => {
         phoneNumber: cleanPhone,
         type: "Template",
         template: {
-          name: "entry_pass",
+          name: "entry_pass", 
           languageCode: "en",
           bodyValues: [
             String(user.full_name || "User"),
