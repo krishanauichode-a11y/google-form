@@ -26,7 +26,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// ✅ TEMP FOLDER
+// ✅ TEMP STORAGE
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -49,18 +49,18 @@ async function generateFinalImage(id) {
   const canvas = createCanvas(700, 900);
   const ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, 700, 900);
 
   ctx.fillStyle = "#000";
   ctx.font = "bold 34px Arial";
-  ctx.fillText("ENTRY PASS", 220, 60);
+  ctx.fillText("ENTRY PASS", 200, 60);
 
   ctx.drawImage(qr, 200, 120, 300, 300);
-  ctx.drawImage(barcode, 50, 480, 600, 180); // bigger barcode
+  ctx.drawImage(barcode, 50, 480, 600, 180);
 
-  ctx.font = "20px Arial";
-  ctx.fillText("Scan QR or Barcode", 200, 750);
+  ctx.font = "18px Arial";
+  ctx.fillText("Scan QR or Barcode at Entry", 180, 750);
 
   const finalPath = path.join(tempDir, `${id}-final.png`);
   fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
@@ -100,32 +100,32 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // QR → full URL
+    // ✅ QR (URL)
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // Barcode → SHORT URL (fix scanning)
-  const barcodeBuffer = await bwipjs.toBuffer({
-  bcid: "code128",
-  text: id,              // ✅ ONLY ID (important)
-  scale: 3,              // not too dense
-  height: 18,            // taller = better scanning
-  includetext: true,     // shows ID below barcode
-  textxalign: "center",
-  padding: 10
-});
+    // ✅ Barcode (ONLY ID — SCANNABLE)
+    const barcodeBuffer = await bwipjs.toBuffer({
+      bcid: "code128",
+      text: id,
+      scale: 3,
+      height: 20,
+      includetext: true,
+      textxalign: "center",
+      padding: 10
+    });
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ CREATE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 📲 SHARE INTERAKT
+// 📲 SHARE VIA INTERAKT TEMPLATE
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
@@ -137,6 +137,10 @@ app.post("/share-interakt", async (req, res) => {
       "SELECT * FROM users WHERE id=$1",
       [id]
     );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
 
     const user = result.rows[0];
 
@@ -151,27 +155,34 @@ app.post("/share-interakt", async (req, res) => {
       body: JSON.stringify({
         countryCode: "+91",
         phoneNumber: cleanPhone,
-        type: "Image",
-        data: {
-          mediaUrl: finalImageUrl,
-          caption: `🎟️ Entry Pass
-Name: ${user.full_name}
-Scan QR or Barcode at entry`
+        type: "Template",
+        template: {
+          name: "entry_pass",
+          languageCode: "en",
+          bodyValues: [
+            user.full_name,
+            "Scan QR or Barcode at entry"
+          ],
+          headerValues: [
+            finalImageUrl
+          ]
         }
       })
     });
 
     const data = await response.json();
+    console.log("📱 Interakt Response:", data);
+
     res.json({ success: true, data });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ Interakt Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 👤 USER PAGE (PRO UI)
+// 👤 USER PAGE (PROFESSIONAL UI)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -192,8 +203,6 @@ app.get("/user/:id", async (req, res) => {
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verified Student</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
 <style>
 * {
@@ -313,7 +322,7 @@ body {
 <div class="card">
 
   <div class="card-header">
-    <h2>🎟 Student Entry Pass</h2>
+    <h2>Student Entry Pass</h2>
     <div class="badge">✔ VERIFIED</div>
   </div>
 
@@ -351,7 +360,7 @@ body {
 });
 
 // ==============================
-// 🚀 START
+// 🚀 START SERVER
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
