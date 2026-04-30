@@ -70,36 +70,6 @@ async function generateFinalImage(id) {
   return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 }
 
-/* ==============================
-   INTERAKT MEDIA UPLOAD
-============================== */
-
-async function uploadToInterakt(imageUrl) {
-
-  const upload = await fetch(
-    "https://api.interakt.ai/v1/public/media",
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ url: imageUrl })
-    }
-  );
-
-  const data = await upload.json();
-
-  console.log("📤 MEDIA:", data);
-
-  if (!data.id) {
-    throw new Error("Media upload failed");
-  }
-
-  return data.id;
-}
-
-
 // ==============================
 // 👤 CREATE USER
 // ==============================
@@ -156,80 +126,65 @@ app.post("/create", async (req, res) => {
   }
 });
 
-/* ==============================
-   SHARE INTERAKT TEMPLATE
-============================== */
-
+// ==============================
+// 📲 SHARE INTERAKT TEMPLATE
+// ==============================
 app.post("/share-interakt", async (req, res) => {
-
   try {
-
     const { id, phone } = req.body;
 
-    const cleanPhone =
-      phone.replace(/\D/g, "").slice(-10);
+    // ✅ Clean phone
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
 
-    const result =
-      await pool.query(
-        "SELECT * FROM users WHERE id=$1",
-        [id]
-      );
+    console.log("📱 Phone:", cleanPhone);
 
-    if (!result.rows.length)
-      return res.json({ success:false });
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
 
     const user = result.rows[0];
 
-    /* 1️⃣ Generate Pass */
-    const finalImageUrl =
-      await generateFinalImage(id);
+    const finalImageUrl = await generateFinalImage(id);
 
-    console.log("IMAGE URL:", finalImageUrl);
+    console.log("🖼️ Image URL:", finalImageUrl);
 
-    /* 2️⃣ Upload Media */
-    const mediaId =
-      await uploadToInterakt(finalImageUrl);
+  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+  },
+  body: JSON.stringify({
+    countryCode: "+91",
+    phoneNumber: cleanPhone,
+    type: "Template",
+    template: {
+      name: "entry_pass",
+      languageCode: "en", // ✅ FIXED
+      bodyValues: [
+        String(user.full_name || "User"),
+        "Scan QR or Barcode at entry"
+      ],
+      headerValues: [
+        finalImageUrl // ✅ must be public URL
+      ]
+    }
+  })
+});
 
-    /* 3️⃣ Send WhatsApp Template */
-    const response = await fetch(
-      "https://api.interakt.ai/v1/public/message/",
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "Authorization":`Basic ${process.env.INTERAKT_API_KEY}`
-        },
-        body:JSON.stringify({
-          countryCode:"+91",
-          phoneNumber:cleanPhone,
-          type:"Template",
-          template:{
-            name:"entry_pass",
-            languageCode:"en",
-            bodyValues:[
-              user.full_name,
-              "is ready"
-            ],
-            headerMedia:{
-              id:mediaId
-            }
-          }
-        })
-      }
-    );
+    const data = await response.json();
+    console.log("📱 Interakt Response:", data);
 
-    const data = await response.text();
+    res.json({ success: true, data });
 
-    console.log("📱 INTERAKT:", data);
-
-    res.json({
-      success:true,
-      response:data
-    });
-
-  } catch(err){
-    console.error(err);
-    res.status(500).json({error:err.message});
+  } catch (err) {
+    console.error("❌ Interakt Error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
