@@ -106,7 +106,7 @@ app.post("/create", async (req, res) => {
     );
 
     // 🔐 TOKEN
-    const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: "2d" });
+    const token = jwt.sign({ id }, JWT_SECRET);
 
     const url = `https://google-form-kebh.onrender.com/user/${token}`;
 
