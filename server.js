@@ -49,18 +49,20 @@ async function generateFinalImage(id) {
   const canvas = createCanvas(700, 900);
   const ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, 700, 900);
 
   ctx.fillStyle = "#000";
-  ctx.font = "bold 34px Arial";
-  ctx.fillText("ENTRY PASS", 200, 60);
+  ctx.font = "bold 32px Arial";
+  ctx.fillText("ENTRY PASS", 220, 60);
 
   ctx.drawImage(qr, 200, 120, 300, 300);
+
+  // 🔥 Bigger barcode = better scan
   ctx.drawImage(barcode, 50, 480, 600, 180);
 
   ctx.font = "18px Arial";
-  ctx.fillText("Scan QR or Barcode at Entry", 180, 750);
+  ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
 
   const finalPath = path.join(tempDir, `${id}-final.png`);
   fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
@@ -100,11 +102,11 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // ✅ QR (URL)
+    // QR → URL
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // ✅ Barcode (ONLY ID — SCANNABLE)
+    // Barcode → ID only (SCANNABLE)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
@@ -125,13 +127,16 @@ app.post("/create", async (req, res) => {
 });
 
 // ==============================
-// 📲 SHARE VIA INTERAKT TEMPLATE
+// 📲 SHARE INTERAKT TEMPLATE
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
+    // ✅ Clean phone
     const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+
+    console.log("📱 Phone:", cleanPhone);
 
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
@@ -144,41 +149,33 @@ app.post("/share-interakt", async (req, res) => {
 
     const user = result.rows[0];
 
-const finalImageUrl = await generateFinalImage(id);
+    const finalImageUrl = await generateFinalImage(id);
 
-console.log("🖼️ Image URL:", finalImageUrl);
-console.log("📱 Phone:", cleanPhone);
+    console.log("🖼️ Image URL:", finalImageUrl);
 
-const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-  },
-  body: JSON.stringify({
-    countryCode: "+91",
-    phoneNumber: cleanPhone,
-    type: "Template",
-    template: {
-      name: "entry_pass",
-      languageCode: "en",
-
-      bodyValues: [
-        String(user.full_name || "User"),
-        "Scan QR or Barcode at entry"
-      ],
-
-      headerValues: [
-        finalImageUrl
-      ]
-    }
-  })
-});
-
-const data = await response.json();
-console.log("📱 Interakt Response:", data);
-
-res.json({ success: true, data });
+    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+      },
+      body: JSON.stringify({
+        countryCode: "+91",
+        phoneNumber: cleanPhone,
+        type: "Template",
+        template: {
+          name: "entry_pass",
+          languageCode: "en",
+          bodyValues: [
+            String(user.full_name || "User"),
+            "Scan QR or Barcode at entry"
+          ],
+          headerValues: [
+            finalImageUrl
+          ]
+        }
+      })
+    });
 
     const data = await response.json();
     console.log("📱 Interakt Response:", data);
@@ -192,7 +189,7 @@ res.json({ success: true, data });
 });
 
 // ==============================
-// 👤 USER PAGE (PROFESSIONAL UI)
+// 👤 USER PAGE (RESPONSIVE)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -213,6 +210,8 @@ app.get("/user/:id", async (req, res) => {
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verified Student</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
 <style>
 * {
@@ -332,7 +331,7 @@ body {
 <div class="card">
 
   <div class="card-header">
-    <h2>Student Entry Pass</h2>
+    <h2>🎟 Student Entry Pass</h2>
     <div class="badge">✔ VERIFIED</div>
   </div>
 
@@ -362,7 +361,8 @@ body {
 
 </body>
 </html>
-`);
+    `);
+
   } catch (err) {
     console.error(err);
     res.send("Error loading user");
