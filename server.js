@@ -162,7 +162,7 @@ app.post("/share-interakt", async (req, res) => {
   body: JSON.stringify({
     countryCode: "+91",
     phoneNumber: cleanPhone,
-    type: "template",
+    type: "Template",
     template: {
       name: "entry_pass",
       languageCode: "en_US", // ✅ FIXED
