@@ -14,12 +14,7 @@ app.use(express.json());
 app.use(cors());
 
 // ==============================
-// 🔐 PASSWORD (CHANGE THIS)
-// ==============================
-const ADMIN_PASSWORD = "entrypass2026";
-
-// ==============================
-// 🗄️ DATABASE
+// ✅ DATABASE
 // ==============================
 const pool = new Pool({
   user: "postgres.ufbttlxvzuchacptqkee",
@@ -31,7 +26,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// 📁 TEMP STORAGE
+// ✅ TEMP STORAGE
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -66,7 +61,7 @@ async function generateFinalImage(id) {
 
   // 👉 Office Name (next to logo)
   ctx.fillStyle = "#000";
-  ctx.font = "bold 26px Arial";
+  ctx.font = "bold 28px Arial";
   ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
 
   // Title
@@ -88,7 +83,6 @@ async function generateFinalImage(id) {
 
   return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 }
-
 // ==============================
 // 👤 CREATE USER
 // ==============================
@@ -121,96 +115,100 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // QR
+    // QR → URL
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // Barcode
+    // Barcode → ID only (SCANNABLE)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
       scale: 3,
       height: 20,
-      includetext: true
+      includetext: true,
+      textxalign: "center",
+      padding: 10
     });
-
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ CREATE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 🔐 STEP 1: PASSWORD PAGE
+// 📲 SHARE INTERAKT TEMPLATE
 // ==============================
-app.get("/user/:id", (req, res) => {
-  const id = req.params.id;
-
-  res.send(`
-  <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <style>
-      body {
-        font-family: Arial;
-        text-align:center;
-        margin-top:100px;
-        background:#f4f4f4;
-      }
-      input {
-        padding:10px;
-        width:220px;
-        border-radius:5px;
-        border:1px solid #ccc;
-      }
-      button {
-        padding:10px 20px;
-        margin-top:10px;
-        background:#00c853;
-        color:#fff;
-        border:none;
-        border-radius:5px;
-      }
-    </style>
-  </head>
-  <body>
-
-    <h2>🔐 Enter Access Password</h2>
-
-    <input type="password" id="pwd" placeholder="Enter password"/><br>
-    <button onclick="go()">Submit</button>
-
-    <script>
-      function go(){
-        const pwd = document.getElementById("pwd").value;
-        window.location.href = "/verify/${id}?key=" + pwd;
-      }
-    </script>
-
-  </body>
-  </html>
-  `);
-});
-
-// ==============================
-// 🔐 STEP 2: VERIFY PASSWORD + SHOW DATA
-// ==============================
-app.get("/verify/:id", async (req, res) => {
+app.post("/share-interakt", async (req, res) => {
   try {
-    const id = req.params.id;
-    const key = req.query.key;
+    const { id, phone } = req.body;
 
-    if (key !== ADMIN_PASSWORD) {
-      return res.send("<h2 style='text-align:center;margin-top:50px;'>❌ Wrong Password</h2>");
-    }
+    // ✅ Clean phone
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+
+    console.log("📱 Phone:", cleanPhone);
 
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
       [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    const user = result.rows[0];
+
+    const finalImageUrl = await generateFinalImage(id);
+
+    console.log("🖼️ Image URL:", finalImageUrl);
+
+  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+  },
+  body: JSON.stringify({
+    countryCode: "+91",
+    phoneNumber: cleanPhone,
+    type: "Template",
+    template: {
+      name: "entry_pass",
+      languageCode: "en", // ✅ FIXED
+      bodyValues: [
+        String(user.full_name || "User"),
+        "Scan QR or Barcode at entry"
+      ],
+      headerValues: [
+        finalImageUrl // ✅ must be public URL
+      ]
+    }
+  })
+});
+
+    const data = await response.json();
+    console.log("📱 Interakt Response:", data);
+
+    res.json({ success: true, data });
+
+  } catch (err) {
+    console.error("❌ Interakt Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================
+// 👤 USER PAGE (RESPONSIVE)
+// ==============================
+app.get("/user/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [req.params.id]
     );
 
     if (result.rows.length === 0) {
@@ -380,7 +378,8 @@ body {
     `);
 
   } catch (err) {
-    res.send("Server Error");
+    console.error(err);
+    res.send("Error loading user");
   }
 });
 
