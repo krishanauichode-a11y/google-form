@@ -144,31 +144,41 @@ app.post("/share-interakt", async (req, res) => {
 
     const user = result.rows[0];
 
-    const finalImageUrl = await generateFinalImage(id);
+const finalImageUrl = await generateFinalImage(id);
 
-    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-      },
-      body: JSON.stringify({
-        countryCode: "+91",
-        phoneNumber: cleanPhone,
-        type: "Template",
-        template: {
-          name: "entry_pass",
-          languageCode: "en",
-          bodyValues: [
-            user.full_name,
-            "Scan QR or Barcode at entry"
-          ],
-          headerValues: [
-            finalImageUrl
-          ]
-        }
-      })
-    });
+console.log("🖼️ Image URL:", finalImageUrl);
+console.log("📱 Phone:", cleanPhone);
+
+const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+  },
+  body: JSON.stringify({
+    countryCode: "+91",
+    phoneNumber: cleanPhone,
+    type: "Template",
+    template: {
+      name: "entry_pass",
+      languageCode: "en",
+
+      bodyValues: [
+        String(user.full_name || "User"),
+        "Scan QR or Barcode at entry"
+      ],
+
+      headerValues: [
+        finalImageUrl
+      ]
+    }
+  })
+});
+
+const data = await response.json();
+console.log("📱 Interakt Response:", data);
+
+res.json({ success: true, data });
 
     const data = await response.json();
     console.log("📱 Interakt Response:", data);
