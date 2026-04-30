@@ -26,7 +26,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// ✅ TEMP STORAGE
+// ✅ TEMP FOLDER
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -53,16 +53,14 @@ async function generateFinalImage(id) {
   ctx.fillRect(0, 0, 700, 900);
 
   ctx.fillStyle = "#000";
-  ctx.font = "bold 32px Arial";
+  ctx.font = "bold 34px Arial";
   ctx.fillText("ENTRY PASS", 220, 60);
 
   ctx.drawImage(qr, 200, 120, 300, 300);
+  ctx.drawImage(barcode, 50, 480, 600, 180); // bigger barcode
 
-  // 🔥 Bigger barcode = better scan
-  ctx.drawImage(barcode, 50, 480, 600, 180);
-
-  ctx.font = "18px Arial";
-  ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
+  ctx.font = "20px Arial";
+  ctx.fillText("Scan QR or Barcode", 200, 750);
 
   const finalPath = path.join(tempDir, `${id}-final.png`);
   fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
@@ -102,94 +100,78 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // QR → URL
+    // QR → full URL
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // Barcode → ID only (SCANNABLE)
-    const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: id,
-      scale: 3,
-      height: 20,
-      includetext: true,
-      textxalign: "center",
-      padding: 10
-    });
+    // Barcode → SHORT URL (fix scanning)
+  const barcodeBuffer = await bwipjs.toBuffer({
+  bcid: "code128",
+  text: id,              // ✅ ONLY ID (important)
+  scale: 3,              // not too dense
+  height: 18,            // taller = better scanning
+  includetext: true,     // shows ID below barcode
+  textxalign: "center",
+  padding: 10
+});
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
 
   } catch (err) {
-    console.error("❌ CREATE ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 📲 SHARE INTERAKT TEMPLATE
+// 📲 SHARE INTERAKT
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
 
-    // ✅ Clean phone
     const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-
-    console.log("📱 Phone:", cleanPhone);
 
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
       [id]
     );
 
-    if (result.rows.length === 0) {
-      return res.json({ success: false, message: "User not found" });
-    }
-
     const user = result.rows[0];
 
     const finalImageUrl = await generateFinalImage(id);
 
-    console.log("🖼️ Image URL:", finalImageUrl);
-
-  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-  },
-  body: JSON.stringify({
-    countryCode: "+91",
-    phoneNumber: cleanPhone,
-    type: "Template",
-    template: {
-      name: "entry_pass",
-      languageCode: "en", // ✅ FIXED
-      bodyValues: [
-        String(user.full_name || "User"),
-        "Scan QR or Barcode at entry"
-      ],
-      headerValues: [
-        finalImageUrl // ✅ must be public URL
-      ]
-    }
-  })
-});
+    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+      },
+      body: JSON.stringify({
+        countryCode: "+91",
+        phoneNumber: cleanPhone,
+        type: "Image",
+        data: {
+          mediaUrl: finalImageUrl,
+          caption: `🎟️ Entry Pass
+Name: ${user.full_name}
+Scan QR or Barcode at entry`
+        }
+      })
+    });
 
     const data = await response.json();
-    console.log("📱 Interakt Response:", data);
-
     res.json({ success: true, data });
 
   } catch (err) {
-    console.error("❌ Interakt Error:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 👤 USER PAGE (RESPONSIVE)
+// 👤 USER PAGE (PRO UI)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -361,8 +343,7 @@ body {
 
 </body>
 </html>
-    `);
-
+`);
   } catch (err) {
     console.error(err);
     res.send("Error loading user");
@@ -370,7 +351,7 @@ body {
 });
 
 // ==============================
-// 🚀 START SERVER
+// 🚀 START
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
