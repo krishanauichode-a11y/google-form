@@ -15,10 +15,10 @@ app.use(express.json());
 app.use(cors());
 
 // ==============================
-// 🔐 SECRET CONFIG
+// 🔐 CONFIG
 // ==============================
-const JWT_SECRET = "Xy7!kL92@pQ#secureToken";   // strong random
-const ADMIN_KEY = "entrypass2026";            // easy for you
+const JWT_SECRET = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+const ADMIN_PASSWORD = "entrypass2026"; // password user enters
 
 // ==============================
 // 🗄️ DATABASE
@@ -43,7 +43,7 @@ app.use("/temp", express.static(tempDir));
 // 🏠 HOME
 // ==============================
 app.get("/", (req, res) => {
-  res.send("✅ Server Running Secure QR");
+  res.send("✅ Server Running (Password Protected QR)");
 });
 
 // ==============================
@@ -76,7 +76,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER + SECURE QR
+// 👤 CREATE USER + QR
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -89,7 +89,6 @@ app.post("/create", async (req, res) => {
 
     const id = uuidv4();
 
-    // SAVE USER
     await pool.query(
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
@@ -106,59 +105,102 @@ app.post("/create", async (req, res) => {
       ]
     );
 
-    // 🔐 CREATE JWT TOKEN
-    const token = jwt.sign(
-      { id },
-      JWT_SECRET,
-      { expiresIn: "2d" } // expiry
-    );
+    // 🔐 TOKEN
+    const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: "2d" });
 
-    const secureUrl = `https://google-form-kebh.onrender.com/user/${token}?key=${ADMIN_KEY}`;
+    const url = `https://google-form-kebh.onrender.com/user/${token}`;
 
-    // 📱 QR CODE
-    const qrBuffer = await QRCode.toBuffer(secureUrl);
+    // QR
+    const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // 📊 BARCODE (only ID)
+    // BARCODE
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
       scale: 3,
       height: 18,
-      includetext: true,
-      textxalign: "center",
-      padding: 10
+      includetext: true
     });
 
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
-    res.json({ success: true, id, token });
+    res.json({ success: true, id });
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 🔐 SECURE USER PAGE
+// 🔐 STEP 1: PASSWORD PAGE
 // ==============================
-app.get("/user/:token", async (req, res) => {
+app.get("/user/:token", (req, res) => {
+  const token = req.params.token;
+
+  res.send(`
+  <html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <style>
+      body {
+        font-family: Arial;
+        text-align:center;
+        margin-top:100px;
+        background:#f4f4f4;
+      }
+      input {
+        padding:10px;
+        width:200px;
+        border-radius:5px;
+        border:1px solid #ccc;
+      }
+      button {
+        padding:10px 20px;
+        margin-top:10px;
+        background:#00c853;
+        color:#fff;
+        border:none;
+        border-radius:5px;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h2>🔐 Enter Access Password</h2>
+
+    <input type="password" id="pwd" placeholder="Enter password"/><br>
+    <button onclick="go()">Submit</button>
+
+    <script>
+      function go(){
+        const pwd = document.getElementById("pwd").value;
+        window.location.href = "/verify/${token}?key=" + pwd;
+      }
+    </script>
+
+  </body>
+  </html>
+  `);
+});
+
+// ==============================
+// 🔐 STEP 2: VERIFY PASSWORD + SHOW DATA
+// ==============================
+app.get("/verify/:token", async (req, res) => {
   try {
     const token = req.params.token;
     const key = req.query.key;
 
-    // ❌ BLOCK IF WRONG KEY
-    if (key !== ADMIN_KEY) {
-      return res.send("<h2>❌ Unauthorized - Invalid Key</h2>");
+    if (key !== ADMIN_PASSWORD) {
+      return res.send("<h2>❌ Wrong Password</h2>");
     }
 
-    // 🔐 VERIFY TOKEN
     let decoded;
     try {
       decoded = jwt.verify(token, JWT_SECRET);
     } catch (err) {
-      return res.send("<h2>❌ QR Expired or Invalid</h2>");
+      return res.send("<h2>❌ QR Expired</h2>");
     }
 
     const result = await pool.query(
@@ -173,7 +215,7 @@ app.get("/user/:token", async (req, res) => {
     const u = result.rows[0];
 
     res.send(`
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -332,7 +374,6 @@ body {
     `);
 
   } catch (err) {
-    console.error(err);
     res.send("Server Error");
   }
 });
@@ -360,7 +401,7 @@ app.post("/share-interakt", async (req, res) => {
         type: "Image",
         data: {
           mediaUrl: finalImageUrl,
-          caption: `🎟️ Entry Pass\nScan at entry`
+          caption: `🎟️ Entry Pass\nScan QR & enter password`
         }
       })
     });
@@ -369,7 +410,6 @@ app.post("/share-interakt", async (req, res) => {
     res.json({ success: true, data });
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -379,5 +419,5 @@ app.post("/share-interakt", async (req, res) => {
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("🚀 Secure Server running on port " + PORT);
+  console.log("🚀 Server running on port " + PORT);
 });
