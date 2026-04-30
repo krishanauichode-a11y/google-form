@@ -14,7 +14,12 @@ app.use(express.json());
 app.use(cors());
 
 // ==============================
-// ✅ DATABASE
+// 🔐 PASSWORD (CHANGE THIS)
+// ==============================
+const ADMIN_PASSWORD = "entrypass2026";
+
+// ==============================
+// 🗄️ DATABASE
 // ==============================
 const pool = new Pool({
   user: "postgres.ufbttlxvzuchacptqkee",
@@ -26,7 +31,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// ✅ TEMP STORAGE
+// 📁 TEMP STORAGE
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -36,7 +41,7 @@ app.use("/temp", express.static(tempDir));
 // 🏠 HOME
 // ==============================
 app.get("/", (req, res) => {
-  res.send("✅ Server Running");
+  res.send("✅ Server Running (Password Protected QR)");
 });
 
 // ==============================
@@ -57,8 +62,6 @@ async function generateFinalImage(id) {
   ctx.fillText("ENTRY PASS", 220, 60);
 
   ctx.drawImage(qr, 200, 120, 300, 300);
-
-  // 🔥 Bigger barcode = better scan
   ctx.drawImage(barcode, 50, 480, 600, 180);
 
   ctx.font = "18px Arial";
@@ -102,100 +105,96 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // QR → URL
+    // QR
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // Barcode → ID only (SCANNABLE)
+    // Barcode
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
       scale: 3,
       height: 20,
-      includetext: true,
-      textxalign: "center",
-      padding: 10
+      includetext: true
     });
+
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
 
   } catch (err) {
-    console.error("❌ CREATE ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 📲 SHARE INTERAKT TEMPLATE
+// 🔐 STEP 1: PASSWORD PAGE
 // ==============================
-app.post("/share-interakt", async (req, res) => {
+app.get("/user/:id", (req, res) => {
+  const id = req.params.id;
+
+  res.send(`
+  <html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <style>
+      body {
+        font-family: Arial;
+        text-align:center;
+        margin-top:100px;
+        background:#f4f4f4;
+      }
+      input {
+        padding:10px;
+        width:220px;
+        border-radius:5px;
+        border:1px solid #ccc;
+      }
+      button {
+        padding:10px 20px;
+        margin-top:10px;
+        background:#00c853;
+        color:#fff;
+        border:none;
+        border-radius:5px;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h2>🔐 Enter Access Password</h2>
+
+    <input type="password" id="pwd" placeholder="Enter password"/><br>
+    <button onclick="go()">Submit</button>
+
+    <script>
+      function go(){
+        const pwd = document.getElementById("pwd").value;
+        window.location.href = "/verify/${id}?key=" + pwd;
+      }
+    </script>
+
+  </body>
+  </html>
+  `);
+});
+
+// ==============================
+// 🔐 STEP 2: VERIFY PASSWORD + SHOW DATA
+// ==============================
+app.get("/verify/:id", async (req, res) => {
   try {
-    const { id, phone } = req.body;
+    const id = req.params.id;
+    const key = req.query.key;
 
-    // ✅ Clean phone
-    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-
-    console.log("📱 Phone:", cleanPhone);
+    if (key !== ADMIN_PASSWORD) {
+      return res.send("<h2 style='text-align:center;margin-top:50px;'>❌ Wrong Password</h2>");
+    }
 
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
       [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json({ success: false, message: "User not found" });
-    }
-
-    const user = result.rows[0];
-
-    const finalImageUrl = await generateFinalImage(id);
-
-    console.log("🖼️ Image URL:", finalImageUrl);
-
-  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-  },
-  body: JSON.stringify({
-    countryCode: "+91",
-    phoneNumber: cleanPhone,
-    type: "Template",
-    template: {
-      name: "entry_pass",
-      languageCode: "en", // ✅ FIXED
-      bodyValues: [
-        String(user.full_name || "User"),
-        "Scan QR or Barcode at entry"
-      ],
-      headerValues: [
-        finalImageUrl // ✅ must be public URL
-      ]
-    }
-  })
-});
-
-    const data = await response.json();
-    console.log("📱 Interakt Response:", data);
-
-    res.json({ success: true, data });
-
-  } catch (err) {
-    console.error("❌ Interakt Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ==============================
-// 👤 USER PAGE (RESPONSIVE)
-// ==============================
-app.get("/user/:id", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM users WHERE id=$1",
-      [req.params.id]
     );
 
     if (result.rows.length === 0) {
@@ -365,8 +364,7 @@ body {
     `);
 
   } catch (err) {
-    console.error(err);
-    res.send("Error loading user");
+    res.send("Server Error");
   }
 });
 
