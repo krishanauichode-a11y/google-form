@@ -331,7 +331,8 @@ body {
 <div class="card">
 
   <div class="card-header">
-    <h2>🎟 Student Entry Pass</h2>
+  <h2>TUSHAR BHUMKAR INSTITUTE</h2>
+    <h2>Student Entry Pass</h2>
     <div class="badge">✔ VERIFIED</div>
   </div>
 
