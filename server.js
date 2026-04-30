@@ -33,6 +33,20 @@ const pool = new Pool({
 // ==============================
 // 📁 TEMP STORAGE
 // ==============================
+const tempDir = path.join(__dirname, "temp");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+app.use("/temp", express.static(tempDir));
+
+// ==============================
+// 🏠 HOME
+// ==============================
+app.get("/", (req, res) => {
+  res.send("✅ Server Running");
+});
+
+// ==============================
+// 🎟️ GENERATE FINAL IMAGE
+// ==============================
 async function generateFinalImage(id) {
   const qr = await loadImage(path.join(tempDir, `${id}-qr.png`));
   const barcode = await loadImage(path.join(tempDir, `${id}-barcode.png`));
