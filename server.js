@@ -165,7 +165,7 @@ app.post("/share-interakt", async (req, res) => {
     type: "Template",
     template: {
       name: "entry_pass",
-      languageCode: "en", // ✅ FIXED
+      languageCode: "en_US", // ✅ FIXED
       bodyValues: [
         String(user.full_name || "User"),
         "Scan QR or Barcode at entry"
