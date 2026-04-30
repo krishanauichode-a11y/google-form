@@ -46,9 +46,6 @@ async function generateFinalImage(id) {
   const qr = await loadImage(path.join(tempDir, `${id}-qr.png`));
   const barcode = await loadImage(path.join(tempDir, `${id}-barcode.png`));
 
-  // 👉 Load your logo (put logo.png inside /temp or /assets folder)
-  const logo = await loadImage(path.join(__dirname, "logo.png"));
-
   const canvas = createCanvas(700, 900);
   const ctx = canvas.getContext("2d");
 
