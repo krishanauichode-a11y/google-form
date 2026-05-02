@@ -39,8 +39,20 @@ const pool = new Pool({
 // ==============================
 // 📁 TEMP STORAGE
 // ==============================
+// ==============================
+// 📁 TEMP STORAGE (FIXED)
+// ==============================
 const tempDir = path.join(__dirname, "temp");
-if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+// Ensure folder ALWAYS exists
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+}
+
+// Debug log
+console.log("📁 Temp directory:", tempDir);
+
+// Serve static files
 app.use("/temp", express.static(tempDir));
 
 // ==============================
@@ -54,32 +66,49 @@ app.get("/", (req, res) => {
 // 🎟️ GENERATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
-  const qr = await loadImage(path.join(tempDir, `${id}-qr.png`));
-  const barcode = await loadImage(path.join(tempDir, `${id}-barcode.png`));
+  try {
+    const qrPath = path.join(tempDir, `${id}-qr.png`);
+    const barPath = path.join(tempDir, `${id}-barcode.png`);
 
-  const canvas = createCanvas(700, 900);
-  const ctx = canvas.getContext("2d");
+    console.log("📁 Checking files:", qrPath, barPath);
 
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, 700, 900);
+    if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
+      throw new Error("QR or Barcode file missing");
+    }
 
-  ctx.fillStyle = "#000";
-  ctx.font = "bold 28px Arial";
-  ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
+    const qr = await loadImage(qrPath);
+    const barcode = await loadImage(barPath);
 
-  ctx.font = "bold 32px Arial";
-  ctx.fillText("ENTRY PASS", 230, 120);
+    const canvas = createCanvas(700, 900);
+    const ctx = canvas.getContext("2d");
 
-  ctx.drawImage(qr, 200, 160, 300, 300);
-  ctx.drawImage(barcode, 50, 500, 600, 180);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, 700, 900);
 
-  ctx.font = "18px Arial";
-  ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
 
-  const finalPath = path.join(tempDir, `${id}-final.png`);
-  fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
+    ctx.font = "bold 32px Arial";
+    ctx.fillText("ENTRY PASS", 230, 120);
 
-  return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
+    ctx.drawImage(qr, 200, 160, 300, 300);
+    ctx.drawImage(barcode, 50, 500, 600, 180);
+
+    ctx.font = "18px Arial";
+    ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
+
+    const finalPath = path.join(tempDir, `${id}-final.png`);
+    fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
+
+    console.log("✅ Final image created:", finalPath);
+
+    return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
+
+  } catch (err) {
+    console.error("❌ IMAGE GENERATION ERROR:", err);
+    throw err;
+  }
 }
 
 // ==============================
@@ -141,18 +170,22 @@ app.post("/create", async (req, res) => {
 // SEND EMAIL
 // ==============================
 app.post("/send-email", async (req, res) => {
-  const { id, email } = req.body;
+  try {
+    const { id, email } = req.body;
 
-  const result = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+    const result = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+    const user = result.rows[0];
 
-  const user = result.rows[0];
+    const finalImageUrl = await generateFinalImage(id);
 
-  const finalImageUrl = await generateFinalImage(id);
+    await sendEmail(email, user.full_name, finalImageUrl);
 
-  // ✅ THIS NOW WORKS
-  await sendEmail(email, user.full_name, finalImageUrl);
+    res.json({ success: true });
 
-  res.json({ success: true });
+  } catch (err) {
+    console.error("❌ EMAIL ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==============================
