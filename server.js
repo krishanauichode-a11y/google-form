@@ -191,6 +191,37 @@ app.post("/share-interakt", async (req, res) => {
 });
 
 // ==============================
+// 🔐 Email Send
+// ==============================
+
+app.post("/send-email", async (req, res) => {
+  try {
+    const { id, email } = req.body;
+
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    const user = result.rows[0];
+
+    const finalImageUrl = await generateFinalImage(id);
+
+    await sendEmail(email, user.full_name, finalImageUrl);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ EMAIL ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================
 // 🔐 ADMIN CHECK
 // ==============================
 function checkAdmin(req, res) {
