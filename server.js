@@ -2,13 +2,15 @@ const express = require("express");
 const { Pool } = require("pg");
 const QRCode = require("qrcode");
 const bwipjs = require("bwip-js");
-const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const fetch = require("node-fetch");
 const session = require("express-session");
 const { createCanvas, loadImage } = require("canvas");
+
+function generateNumericId() {
+  return Date.now().toString(); // BEST for scanners
 
 const app = express();
 app.use(express.json());
@@ -56,24 +58,27 @@ async function generateFinalImage(id) {
   const qr = await loadImage(path.join(tempDir, `${id}-qr.png`));
   const barcode = await loadImage(path.join(tempDir, `${id}-barcode.png`));
 
-  const canvas = createCanvas(700, 900);
+  const canvas = createCanvas(800, 1000);
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, 700, 900);
+  ctx.fillRect(0, 0, 800, 1000);
 
   ctx.fillStyle = "#000";
-  ctx.font = "bold 28px Arial";
-  ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
+  ctx.font = "bold 30px Arial";
+  ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 100, 60);
 
-  ctx.font = "bold 32px Arial";
-  ctx.fillText("ENTRY PASS", 230, 120);
+  ctx.font = "bold 36px Arial";
+  ctx.fillText("ENTRY PASS", 280, 120);
 
-  ctx.drawImage(qr, 200, 160, 300, 300);
-  ctx.drawImage(barcode, 50, 500, 600, 180);
+  // ✅ QR (centered)
+  ctx.drawImage(qr, 250, 180, 300, 300);
 
-  ctx.font = "18px Arial";
-  ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
+  // ✅ Barcode (big + clean)
+  ctx.drawImage(barcode, 50, 550, 700, 220);
+
+  ctx.font = "20px Arial";
+  ctx.fillText("Scan QR or Barcode at Entry", 220, 820);
 
   const finalPath = path.join(tempDir, `${id}-final.png`);
   fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
@@ -93,7 +98,8 @@ app.post("/create", async (req, res) => {
       amount, paymentMode
     } = req.body;
 
-    const id = uuidv4();
+    // ✅ NEW ID
+    const id = generateNumericId();
 
     await pool.query(
       `INSERT INTO users(
@@ -113,17 +119,24 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    const qrBuffer = await QRCode.toBuffer(url);
+    // ✅ QR CODE (unchanged but high quality)
+    const qrBuffer = await QRCode.toBuffer(url, {
+      width: 500
+    });
+
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
+    // ✅ FIXED BARCODE (VERY IMPORTANT)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: id,
-      scale: 3,
-      height: 20,
+      text: id,                 // numeric ID only
+      scale: 4,                 // bigger
+      height: 60,               // tall = better scan
       includetext: true,
       textxalign: "center",
-      padding: 10
+      paddingwidth: 25,         // quiet zone
+      paddingheight: 25,
+      backgroundcolor: "FFFFFF"
     });
 
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
@@ -135,7 +148,6 @@ app.post("/create", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 // ==============================
 // 📲 SHARE INTERAKT (FIXED)
 // ==============================
