@@ -11,6 +11,7 @@ const { createCanvas, loadImage } = require("canvas");
 
 function generateNumericId() {
   return Date.now().toString(); // BEST for scanners
+}
 
 const app = express();
 app.use(express.json());
