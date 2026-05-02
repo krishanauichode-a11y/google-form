@@ -93,7 +93,7 @@ async function generateFinalImage(id) {
     ctx.fillText("ENTRY PASS", 230, 120);
 
     ctx.drawImage(qr, 200, 160, 300, 300);
-    ctx.drawImage(barcode, 50, 500, 600, 180);
+    ctx.drawImage(barcode, 50, 500);
 
     ctx.font = "18px Arial";
     ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
@@ -148,15 +148,18 @@ app.post("/create", async (req, res) => {
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
     // ✅ Barcode
-    const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: id,
-      scale: 3,
-      height: 20,
-      includetext: true,
-      textxalign: "center",
-      padding: 10
-    });
+const shortId = id.replace(/-/g, "").substring(0, 12).toUpperCase();
+
+const barcodeBuffer = await bwipjs.toBuffer({
+  bcid: "code128",
+  text: shortId,       // ✅ shorter text
+  scale: 4,            // ✅ thicker bars
+  height: 60,          // ✅ MUCH taller
+  includetext: true,
+  textxalign: "center",
+  paddingwidth: 20,    // ✅ left/right space
+  paddingheight: 10
+});
 
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
