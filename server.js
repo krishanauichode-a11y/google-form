@@ -7,11 +7,21 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const fetch = require("node-fetch");
+const session = require("express-session");
 const { createCanvas, loadImage } = require("canvas");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// ==============================
+// 🔐 SESSION (ADMIN LOGIN)
+// ==============================
+app.use(session({
+  secret: "super-secret-key",
+  resave: false,
+  saveUninitialized: true
+}));
 
 // ==============================
 // ✅ DATABASE
@@ -49,26 +59,19 @@ async function generateFinalImage(id) {
   const canvas = createCanvas(700, 900);
   const ctx = canvas.getContext("2d");
 
-  // Background
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, 700, 900);
 
-  // 👉 Office Name (next to logo)
   ctx.fillStyle = "#000";
   ctx.font = "bold 28px Arial";
   ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
 
-  // Title
   ctx.font = "bold 32px Arial";
   ctx.fillText("ENTRY PASS", 230, 120);
 
-  // QR Code
   ctx.drawImage(qr, 200, 160, 300, 300);
-
-  // Barcode (bigger for scan)
   ctx.drawImage(barcode, 50, 500, 600, 180);
 
-  // Footer text
   ctx.font = "18px Arial";
   ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
 
@@ -77,6 +80,7 @@ async function generateFinalImage(id) {
 
   return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 }
+
 // ==============================
 // 👤 CREATE USER
 // ==============================
@@ -109,11 +113,9 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // QR → URL
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // Barcode → ID only (SCANNABLE)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
@@ -128,78 +130,47 @@ app.post("/create", async (req, res) => {
     res.json({ success: true, id });
 
   } catch (err) {
-    console.error("❌ CREATE ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 📲 SHARE INTERAKT TEMPLATE
+// 🔐 ADMIN PROTECTION MIDDLEWARE
 // ==============================
-app.post("/share-interakt", async (req, res) => {
-  try {
-    const { id, phone } = req.body;
+function checkAdmin(req, res) {
+  const { p } = req.query;
 
-    // ✅ Clean phone
-    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+  if (req.session.isAdmin) return true;
 
-    console.log("📱 Phone:", cleanPhone);
-
-    const result = await pool.query(
-      "SELECT * FROM users WHERE id=$1",
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json({ success: false, message: "User not found" });
-    }
-
-    const user = result.rows[0];
-
-    const finalImageUrl = await generateFinalImage(id);
-
-    console.log("🖼️ Image URL:", finalImageUrl);
-
-  const response = await fetch("https://api.interakt.ai/v1/public/message/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
-  },
-  body: JSON.stringify({
-    countryCode: "+91",
-    phoneNumber: cleanPhone,
-    type: "Template",
-    template: {
-      name: "entry_pass",
-      languageCode: "en", // ✅ FIXED
-      bodyValues: [
-        String(user.full_name || "User"),
-        "Scan QR or Barcode at entry"
-      ],
-      headerValues: [
-        finalImageUrl // ✅ must be public URL
-      ]
-    }
-  })
-});
-
-    const data = await response.json();
-    console.log("📱 Interakt Response:", data);
-
-    res.json({ success: true, data });
-
-  } catch (err) {
-    console.error("❌ Interakt Error:", err);
-    res.status(500).json({ error: err.message });
+  if (p === process.env.ADMIN_PASS) {
+    req.session.isAdmin = true;
+    return true;
   }
-});
+
+  res.send(`
+  <html>
+  <body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
+    <form method="GET" style="text-align:center;">
+      <h2>🔒 Admin Access</h2>
+      <input type="password" name="p" placeholder="Enter Password" required style="padding:10px"/>
+      <br><br>
+      <button type="submit" style="padding:10px 20px">Access</button>
+    </form>
+  </body>
+  </html>
+  `);
+
+  return false;
+}
 
 // ==============================
-// 👤 USER PAGE (RESPONSIVE)
+// 👤 USER PAGE (PROTECTED)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
+    if (!checkAdmin(req, res)) return;
+
     const result = await pool.query(
       "SELECT * FROM users WHERE id=$1",
       [req.params.id]
@@ -217,163 +188,44 @@ app.get("/user/:id", async (req, res) => {
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verified Student</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-
 <style>
-* {
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  font-family: 'Poppins', sans-serif;
-}
-
 body {
-  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  background:#0f2027;
   display:flex;
   justify-content:center;
   align-items:center;
   min-height:100vh;
-  padding:15px;
+  font-family:sans-serif;
 }
-
 .card {
-  width:100%;
-  max-width:420px;
-  background:#ffffff;
-  border-radius:20px;
-  overflow:hidden;
-  box-shadow:0 15px 40px rgba(0,0,0,0.4);
-  animation: fadeIn 0.6s ease;
-}
-
-@keyframes fadeIn {
-  from {opacity:0; transform:translateY(20px);}
-  to {opacity:1; transform:translateY(0);}
-}
-
-/* HEADER */
-.card-header {
-  background: linear-gradient(135deg, #00c853, #009624);
-  color:#fff;
-  text-align:center;
-  padding:20px;
-}
-
-.card-header h2 {
-  font-size:22px;
-  font-weight:600;
-}
-
-.badge {
   background:#fff;
-  color:#00c853;
-  display:inline-block;
-  padding:5px 12px;
-  border-radius:20px;
-  font-size:12px;
-  margin-top:8px;
-  font-weight:600;
-}
-
-/* BODY */
-.card-body {
   padding:20px;
+  border-radius:15px;
+  width:90%;
+  max-width:400px;
 }
-
 .info {
   display:flex;
   justify-content:space-between;
-  padding:10px 0;
-  border-bottom:1px solid #eee;
-  font-size:14px;
-}
-
-.info span:first-child {
-  color:#555;
-  font-weight:500;
-}
-
-.info span:last-child {
-  font-weight:600;
-  color:#222;
-  text-align:right;
-  max-width:55%;
-  word-wrap:break-word;
-}
-
-/* FOOTER */
-.card-footer {
-  text-align:center;
-  padding:15px;
-  font-size:12px;
-  color:#777;
-}
-
-/* STATUS */
-.status {
-  text-align:center;
-  margin-top:10px;
-  font-size:13px;
-  color:#00c853;
-  font-weight:600;
-}
-
-/* MOBILE OPTIMIZATION */
-@media(max-width:400px){
-  .info {
-    flex-direction:column;
-    gap:3px;
-  }
-
-  .info span:last-child {
-    text-align:left;
-  }
+  margin:8px 0;
 }
 </style>
 </head>
-
 <body>
-
 <div class="card">
-
-  <div class="card-header">
-  <h2>TUSHAR BHUMKAR INSTITUTE</h2>
-    <h2>Student Entry Pass</h2>
-    <div class="badge">✔ VERIFIED</div>
-  </div>
-
-  <div class="card-body">
-
-    <div class="info"><span>Name</span><span>${u.full_name}</span></div>
-    <div class="info"><span>Email</span><span>${u.email}</span></div>
-    <div class="info"><span>Phone</span><span>${u.phone}</span></div>
-    <div class="info"><span>DOB</span><span>${u.dob}</span></div>
-    <div class="info"><span>Market</span><span>${u.trading_market}</span></div>
-    <div class="info"><span>Type</span><span>${u.trading_type}</span></div>
-    <div class="info"><span>Source</span><span>${u.source}</span></div>
-    <div class="info"><span>Software</span><span>${u.software_used}</span></div>
-    <div class="info"><span>Level</span><span>${u.level}</span></div>
-    <div class="info"><span>Paid</span><span>₹ ${u.amount}</span></div>
-    <div class="info"><span>Mode</span><span>${u.payment_mode}</span></div>
-
-    <div class="status">✔ Valid Entry Approved</div>
-
-  </div>
-
-  <div class="card-footer">
-    Scan QR / Barcode at Entry Gate
-  </div>
-
+<h2>✔ Verified Entry</h2>
+<div class="info"><span>Name</span><span>${u.full_name}</span></div>
+<div class="info"><span>Email</span><span>${u.email}</span></div>
+<div class="info"><span>Phone</span><span>${u.phone}</span></div>
+<div class="info"><span>Amount</span><span>₹ ${u.amount}</span></div>
 </div>
-
 </body>
 </html>
     `);
 
   } catch (err) {
     console.error(err);
-    res.send("Error loading user");
+    res.send("Error");
   }
 });
 
