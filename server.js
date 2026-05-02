@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const { Pool } = require("pg");
 const QRCode = require("qrcode");
@@ -15,7 +17,7 @@ app.use(express.json());
 app.use(cors());
 
 // ==============================
-// 🔐 SESSION (ADMIN LOGIN)
+// 🔐 SESSION
 // ==============================
 app.use(session({
   secret: "super-secret-key",
@@ -36,7 +38,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// ✅ TEMP STORAGE
+// 📁 TEMP STORAGE
 // ==============================
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -125,18 +127,73 @@ app.post("/create", async (req, res) => {
       textxalign: "center",
       padding: 10
     });
+
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
     res.json({ success: true, id });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ CREATE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ==============================
-// 🔐 ADMIN PROTECTION MIDDLEWARE
+// 📲 SHARE INTERAKT (FIXED)
+// ==============================
+app.post("/share-interakt", async (req, res) => {
+  try {
+    const { id, phone } = req.body;
+
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    const user = result.rows[0];
+
+    const finalImageUrl = await generateFinalImage(id);
+
+    const response = await fetch("https://api.interakt.ai/v1/public/message/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${process.env.INTERAKT_API_KEY}`
+      },
+      body: JSON.stringify({
+        countryCode: "+91",
+        phoneNumber: cleanPhone,
+        type: "Template",
+        template: {
+          name: "entry_pass",
+          languageCode: "en",
+          bodyValues: [
+            String(user.full_name || "User"),
+            "Scan QR or Barcode at entry"
+          ],
+          headerValues: [finalImageUrl]
+        }
+      })
+    });
+
+    const data = await response.json();
+
+    res.json({ success: true, data });
+
+  } catch (err) {
+    console.error("❌ INTERAKT ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================
+// 🔐 ADMIN CHECK
 // ==============================
 function checkAdmin(req, res) {
   const { p } = req.query;
@@ -188,44 +245,163 @@ app.get("/user/:id", async (req, res) => {
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verified Student</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
 <style>
+* {
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family: 'Poppins', sans-serif;
+}
+
 body {
-  background:#0f2027;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
   display:flex;
   justify-content:center;
   align-items:center;
   min-height:100vh;
-  font-family:sans-serif;
+  padding:15px;
 }
+
 .card {
-  background:#fff;
-  padding:20px;
-  border-radius:15px;
-  width:90%;
-  max-width:400px;
+  width:100%;
+  max-width:420px;
+  background:#ffffff;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 15px 40px rgba(0,0,0,0.4);
+  animation: fadeIn 0.6s ease;
 }
+
+@keyframes fadeIn {
+  from {opacity:0; transform:translateY(20px);}
+  to {opacity:1; transform:translateY(0);}
+}
+
+/* HEADER */
+.card-header {
+  background: linear-gradient(135deg, #00c853, #009624);
+  color:#fff;
+  text-align:center;
+  padding:20px;
+}
+
+.card-header h2 {
+  font-size:22px;
+  font-weight:600;
+}
+
+.badge {
+  background:#fff;
+  color:#00c853;
+  display:inline-block;
+  padding:5px 12px;
+  border-radius:20px;
+  font-size:12px;
+  margin-top:8px;
+  font-weight:600;
+}
+
+/* BODY */
+.card-body {
+  padding:20px;
+}
+
 .info {
   display:flex;
   justify-content:space-between;
-  margin:8px 0;
+  padding:10px 0;
+  border-bottom:1px solid #eee;
+  font-size:14px;
+}
+
+.info span:first-child {
+  color:#555;
+  font-weight:500;
+}
+
+.info span:last-child {
+  font-weight:600;
+  color:#222;
+  text-align:right;
+  max-width:55%;
+  word-wrap:break-word;
+}
+
+/* FOOTER */
+.card-footer {
+  text-align:center;
+  padding:15px;
+  font-size:12px;
+  color:#777;
+}
+
+/* STATUS */
+.status {
+  text-align:center;
+  margin-top:10px;
+  font-size:13px;
+  color:#00c853;
+  font-weight:600;
+}
+
+/* MOBILE OPTIMIZATION */
+@media(max-width:400px){
+  .info {
+    flex-direction:column;
+    gap:3px;
+  }
+
+  .info span:last-child {
+    text-align:left;
+  }
 }
 </style>
 </head>
+
 <body>
+
 <div class="card">
-<h2>✔ Verified Entry</h2>
-<div class="info"><span>Name</span><span>${u.full_name}</span></div>
-<div class="info"><span>Email</span><span>${u.email}</span></div>
-<div class="info"><span>Phone</span><span>${u.phone}</span></div>
-<div class="info"><span>Amount</span><span>₹ ${u.amount}</span></div>
+
+  <div class="card-header">
+  <h2>TUSHAR BHUMKAR INSTITUTE</h2>
+    <h2>Student Entry Pass</h2>
+    <div class="badge">✔ VERIFIED</div>
+  </div>
+
+  <div class="card-body">
+
+    <div class="info"><span>Name</span><span>${u.full_name}</span></div>
+    <div class="info"><span>Email</span><span>${u.email}</span></div>
+    <div class="info"><span>Phone</span><span>${u.phone}</span></div>
+    <div class="info"><span>DOB</span><span>${u.dob}</span></div>
+    <div class="info"><span>Market</span><span>${u.trading_market}</span></div>
+    <div class="info"><span>Type</span><span>${u.trading_type}</span></div>
+    <div class="info"><span>Source</span><span>${u.source}</span></div>
+    <div class="info"><span>Software</span><span>${u.software_used}</span></div>
+    <div class="info"><span>Level</span><span>${u.level}</span></div>
+    <div class="info"><span>Paid</span><span>₹ ${u.amount}</span></div>
+    <div class="info"><span>Mode</span><span>${u.payment_mode}</span></div>
+
+    <div class="status">✔ Valid Entry Approved</div>
+
+  </div>
+
+  <div class="card-footer">
+    Scan QR / Barcode at Entry Gate
+  </div>
+
 </div>
+
 </body>
 </html>
     `);
 
   } catch (err) {
     console.error(err);
-    res.send("Error");
+    res.send("Error loading user");
   }
 });
 
