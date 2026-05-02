@@ -70,8 +70,6 @@ async function generateFinalImage(id) {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
 
-    console.log("📁 Checking files:", qrPath, barPath);
-
     if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
       throw new Error("QR or Barcode file missing");
     }
@@ -79,29 +77,43 @@ async function generateFinalImage(id) {
     const qr = await loadImage(qrPath);
     const barcode = await loadImage(barPath);
 
-    const canvas = createCanvas(700, 900);
+    // 🔥 HD SCALE
+    const scale = 2;
+
+    const canvas = createCanvas(700 * scale, 900 * scale);
     const ctx = canvas.getContext("2d");
 
+    // 🔥 QUALITY SETTINGS
+    ctx.scale(scale, scale);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    // Background
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, 700, 900);
 
+    // Title
     ctx.fillStyle = "#000";
-    ctx.font = "bold 28px Arial";
+    ctx.font = "bold 28px sans-serif";
     ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
 
-    ctx.font = "bold 32px Arial";
+    ctx.font = "bold 32px sans-serif";
     ctx.fillText("ENTRY PASS", 230, 120);
 
+    // Images
     ctx.drawImage(qr, 200, 160, 300, 300);
     ctx.drawImage(barcode, 50, 500, 600, 180);
 
-    ctx.font = "18px Arial";
+    // Footer
+    ctx.font = "18px sans-serif";
     ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
-    fs.writeFileSync(finalPath, canvas.toBuffer("image/png"));
 
-    console.log("✅ Final image created:", finalPath);
+    // 🔥 MAX QUALITY EXPORT
+    fs.writeFileSync(finalPath, canvas.toBuffer("image/png", {
+      compressionLevel: 0
+    }));
 
     return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 
@@ -143,27 +155,26 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // ✅ QR
-    const qrBuffer = await QRCode.toBuffer(url);
+    // 🔥 HIGH QUALITY QR
+    const qrBuffer = await QRCode.toBuffer(url, {
+      width: 800,
+      margin: 2
+    });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // ✅ Barcode
+    // 🔥 HIGH QUALITY BARCODE
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
-      scale: 3,
-      height: 20,
+      scale: 4,
+      height: 25,
       includetext: true,
       textxalign: "center",
       padding: 10
     });
-
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
 
-    // 🔥 CRITICAL FIX
     await generateFinalImage(id);
-
-    console.log("✅ User + Images ready:", id);
 
     res.json({ success: true, id });
 
@@ -172,7 +183,6 @@ app.post("/create", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 // ==============================
 // SEND EMAIL
 // ==============================
