@@ -143,9 +143,11 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
+    // ✅ QR
     const qrBuffer = await QRCode.toBuffer(url);
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
+    // ✅ Barcode
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
@@ -157,6 +159,11 @@ app.post("/create", async (req, res) => {
     });
 
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), barcodeBuffer);
+
+    // 🔥 CRITICAL FIX
+    await generateFinalImage(id);
+
+    console.log("✅ User + Images ready:", id);
 
     res.json({ success: true, id });
 
@@ -238,7 +245,7 @@ app.post("/share-interakt", async (req, res) => {
 
     const user = result.rows[0];
 
-    const finalImageUrl = await generateFinalImage(id);
+  const finalImageUrl = `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 
     const response = await fetch("https://api.interakt.ai/v1/public/message/", {
       method: "POST",
