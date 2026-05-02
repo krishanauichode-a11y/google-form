@@ -9,6 +9,7 @@ const path = require("path");
 const fetch = require("node-fetch");
 const session = require("express-session");
 const { createCanvas, loadImage } = require("canvas");
+const nodemailer = require("nodemailer");
 
 const app = express();
 app.use(express.json());
@@ -137,6 +138,49 @@ app.post("/create", async (req, res) => {
 });
 
 // ==============================
+// SEND EMAIL
+// ==============================
+app.post("/send-email", async (req, res) => {
+  const { id, email } = req.body;
+
+  const result = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+
+  const user = result.rows[0];
+
+  const finalImageUrl = await generateFinalImage(id);
+
+  // ✅ THIS NOW WORKS
+  await sendEmail(email, user.full_name, finalImageUrl);
+
+  res.json({ success: true });
+});
+
+// ==============================
+// 📧 EMAIL SETUP (ADD HERE)
+// ==============================
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+async function sendEmail(to, name, imageUrl) {
+  return transporter.sendMail({
+    from: `"Tushar Bhumkar Institute" <${process.env.EMAIL_USER}>`,
+    to: to,
+    subject: "🎟️ Your Entry Pass",
+    html: `
+      <h2>Hello ${name},</h2>
+      <p>Your entry pass is ready.</p>
+      <img src="${imageUrl}" width="300"/>
+    `
+  });
+}
+
+
+// ==============================
 // 📲 SHARE INTERAKT (FIXED)
 // ==============================
 app.post("/share-interakt", async (req, res) => {
@@ -186,37 +230,6 @@ app.post("/share-interakt", async (req, res) => {
 
   } catch (err) {
     console.error("❌ INTERAKT ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ==============================
-// 🔐 Email Send
-// ==============================
-
-app.post("/send-email", async (req, res) => {
-  try {
-    const { id, email } = req.body;
-
-    const result = await pool.query(
-      "SELECT * FROM users WHERE id=$1",
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json({ success: false, message: "User not found" });
-    }
-
-    const user = result.rows[0];
-
-    const finalImageUrl = await generateFinalImage(id);
-
-    await sendEmail(email, user.full_name, finalImageUrl);
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error("❌ EMAIL ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
