@@ -2,7 +2,7 @@
   "name": "google-form",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
@@ -17,13 +17,13 @@
     "express": "^5.2.1",
     "pg": "^8.20.0",
     "qrcode": "^1.5.4",
-    "uuid": "^14.0.0",
-     "@googleapis/drive": "^20.1.0",
+    "@googleapis/drive": "^20.1.0",
     "axios": "^1.15.2",
-     "canvas": "^3.2.3",
+    "canvas": "^3.2.3",
     "node-fetch": "^2.7.0",
     "jsonwebtoken": "^9.0.3",
     "express-session": "^1.19.0",
-     "nodemailer": "^8.0.7"
+    "nodemailer": "^8.0.7",
+     "uuid": "^14.0.0"
   }
 }
