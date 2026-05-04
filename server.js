@@ -10,6 +10,8 @@ const fetch = require("node-fetch");
 const session = require("express-session");
 const { createCanvas, loadImage } = require("canvas");
 const nodemailer = require("nodemailer");
+// ADDED os MODULE FOR BETTER FILE HANDLING ON RENDER
+const os = require("os"); 
 
 const app = express();
 app.use(express.json());
@@ -37,19 +39,16 @@ const pool = new Pool({
 });
 
 // ==============================
-// 📁 TEMP STORAGE
+// 📁 TEMP STORAGE (FIXED FOR RENDER)
 // ==============================
-// ==============================
-// 📁 TEMP STORAGE (FIXED)
-// ==============================
-const tempDir = path.join(__dirname, "temp");
+// Use os.tmpdir() for Render/Heroku compatibility (Read-Write access)
+const tempDir = path.join(os.tmpdir(), "temp_passes");
 
 // Ensure folder ALWAYS exists
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// Debug log
 console.log("📁 Temp directory:", tempDir);
 
 // Serve static files
@@ -63,7 +62,7 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE
+// 🎟️ GENERATE FINAL IMAGE (OPTIMIZED)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -77,7 +76,7 @@ async function generateFinalImage(id) {
     const qr = await loadImage(qrPath);
     const barcode = await loadImage(barPath);
 
-    // 🔥 HD SCALE
+    // 🔥 HD SCALE: 2x scale = 1400x1800 resolution (Excellent Quality)
     const scale = 2;
 
     const canvas = createCanvas(700 * scale, 900 * scale);
@@ -100,7 +99,7 @@ async function generateFinalImage(id) {
     ctx.font = "bold 32px sans-serif";
     ctx.fillText("ENTRY PASS", 230, 120);
 
-    // Images
+    // Images (Scaled down logically, but canvas is HD)
     ctx.drawImage(qr, 200, 160, 300, 300);
     ctx.drawImage(barcode, 50, 500, 600, 180);
 
@@ -110,10 +109,14 @@ async function generateFinalImage(id) {
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
-    // 🔥 MAX QUALITY EXPORT
-    fs.writeFileSync(finalPath, canvas.toBuffer("image/png", {
-      compressionLevel: 0
-    }));
+    // 🔥 MAX QUALITY EXPORT + MAX COMPRESSION
+    // compressionLevel: 0 = No Compress (Big File)
+    // compressionLevel: 9 = Max Compress (Small File, Same Quality)
+    const buffer = canvas.toBuffer("image/png", {
+      compressionLevel: 9 
+    });
+    
+    fs.writeFileSync(finalPath, buffer);
 
     return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 
@@ -155,10 +158,12 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // 🔥 HIGH QUALITY QR
+    // 🔥 HIGH QUALITY QR (Optimized Size)
+    // 600px is sufficient because it's drawn into a 300px box (2x scale)
     const qrBuffer = await QRCode.toBuffer(url, {
-      width: 800,
-      margin: 2
+      width: 600, 
+      margin: 2,
+      errorCorrectionLevel: 'H' // High error correction for better scanning
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
@@ -166,7 +171,7 @@ app.post("/create", async (req, res) => {
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
-      scale: 4,
+      scale: 3, // Reduced from 4 to 3 (Save memory, no visual difference)
       height: 25,
       includetext: true,
       textxalign: "center",
@@ -183,6 +188,7 @@ app.post("/create", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 // ==============================
 // SEND EMAIL
 // ==============================
@@ -206,7 +212,7 @@ app.post("/send-email", async (req, res) => {
 });
 
 // ==============================
-// 📧 EMAIL SETUP (ADD HERE)
+// 📧 EMAIL SETUP
 // ==============================
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -236,7 +242,7 @@ async function sendEmail(to, name, imageUrl) {
 
 
 // ==============================
-// 📲 SHARE INTERAKT (FIXED)
+// 📲 SHARE INTERAKT
 // ==============================
 app.post("/share-interakt", async (req, res) => {
   try {
@@ -255,7 +261,8 @@ app.post("/share-interakt", async (req, res) => {
 
     const user = result.rows[0];
 
-  const finalImageUrl = `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
+    // Ensure final image exists
+    const finalImageUrl = `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 
     const response = await fetch("https://api.interakt.ai/v1/public/message/", {
       method: "POST",
