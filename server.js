@@ -2,7 +2,8 @@ const express = require("express");
 const { Pool } = require("pg");
 const QRCode = require("qrcode");
 const bwipjs = require("bwip-js");
-const { v4: uuidv4 } = require("uuid");
+// const { v4: uuidv4 } = require("uuid"); // ❌ REMOVED
+const crypto = require("crypto"); // ✅ ADDED
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
@@ -10,8 +11,7 @@ const fetch = require("node-fetch");
 const session = require("express-session");
 const { createCanvas, loadImage } = require("canvas");
 const nodemailer = require("nodemailer");
-// ADDED os MODULE FOR BETTER FILE HANDLING ON RENDER
-const os = require("os"); 
+const os = require("os");
 
 const app = express();
 app.use(express.json());
@@ -41,18 +41,29 @@ const pool = new Pool({
 // ==============================
 // 📁 TEMP STORAGE (FIXED FOR RENDER)
 // ==============================
-// Use os.tmpdir() for Render/Heroku compatibility (Read-Write access)
 const tempDir = path.join(os.tmpdir(), "temp_passes");
 
-// Ensure folder ALWAYS exists
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
 console.log("📁 Temp directory:", tempDir);
 
-// Serve static files
 app.use("/temp", express.static(tempDir));
+
+// ==============================
+// 🔢 SHORT ID GENERATOR (NEW)
+// ==============================
+function generateShortId() {
+  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const randomBytes = crypto.randomBytes(7); // Generate 7 random bytes
+  let result = "";
+  for (let i = 0; i < 7; i++) {
+    // Map byte value (0-255) to char index (0-35)
+    result += chars[randomBytes[i] % chars.length];
+  }
+  return result;
+}
 
 // ==============================
 // 🏠 HOME
@@ -76,13 +87,11 @@ async function generateFinalImage(id) {
     const qr = await loadImage(qrPath);
     const barcode = await loadImage(barPath);
 
-    // 🔥 HD SCALE: 2x scale = 1400x1800 resolution (Excellent Quality)
+    // HD SCALE
     const scale = 2;
-
     const canvas = createCanvas(700 * scale, 900 * scale);
     const ctx = canvas.getContext("2d");
 
-    // 🔥 QUALITY SETTINGS
     ctx.scale(scale, scale);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
@@ -99,7 +108,7 @@ async function generateFinalImage(id) {
     ctx.font = "bold 32px sans-serif";
     ctx.fillText("ENTRY PASS", 230, 120);
 
-    // Images (Scaled down logically, but canvas is HD)
+    // Images
     ctx.drawImage(qr, 200, 160, 300, 300);
     ctx.drawImage(barcode, 50, 500, 600, 180);
 
@@ -109,11 +118,8 @@ async function generateFinalImage(id) {
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
-    // 🔥 MAX QUALITY EXPORT + MAX COMPRESSION
-    // compressionLevel: 0 = No Compress (Big File)
-    // compressionLevel: 9 = Max Compress (Small File, Same Quality)
     const buffer = canvas.toBuffer("image/png", {
-      compressionLevel: 9 
+      compressionLevel: 9
     });
     
     fs.writeFileSync(finalPath, buffer);
@@ -138,7 +144,8 @@ app.post("/create", async (req, res) => {
       amount, paymentMode
     } = req.body;
 
-    const id = uuidv4();
+    // ✅ CHANGED: Generate Short ID instead of UUID
+    const id = generateShortId(); 
 
     await pool.query(
       `INSERT INTO users(
@@ -158,20 +165,19 @@ app.post("/create", async (req, res) => {
 
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // 🔥 HIGH QUALITY QR (Optimized Size)
-    // 600px is sufficient because it's drawn into a 300px box (2x scale)
+    // HIGH QUALITY QR
     const qrBuffer = await QRCode.toBuffer(url, {
       width: 600, 
       margin: 2,
-      errorCorrectionLevel: 'H' // High error correction for better scanning
+      errorCorrectionLevel: 'H' 
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // 🔥 HIGH QUALITY BARCODE
+    // HIGH QUALITY BARCODE
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: id,
-      scale: 3, // Reduced from 4 to 3 (Save memory, no visual difference)
+      scale: 3,
       height: 25,
       includetext: true,
       textxalign: "center",
