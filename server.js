@@ -108,12 +108,11 @@ async function generateFinalImage(id) {
     ctx.font = "18px sans-serif";
     ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
 
-    const finalPath = path.join(tempDir, `${id}-final.png`);
+const finalPath = path.join(tempDir, `${id}-final.jpg`);
 
-    // 🔥 MAX QUALITY EXPORT
-    fs.writeFileSync(finalPath, canvas.toBuffer("image/png", {
-      compressionLevel: 0
-    }));
+fs.writeFileSync(finalPath, canvas.toBuffer("image/jpeg", {
+  quality: 0.85 // 🔥 adjust (0.7–0.9 best range)
+}));
 
     return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 
