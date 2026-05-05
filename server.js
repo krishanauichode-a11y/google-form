@@ -144,7 +144,6 @@ app.post("/create", async (req, res) => {
       amount, paymentMode
     } = req.body;
 
-    // ✅ CHANGED: Generate Short ID instead of UUID
     const id = generateShortId(); 
 
     await pool.query(
@@ -173,11 +172,12 @@ app.post("/create", async (req, res) => {
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // HIGH QUALITY BARCODE
+    // ✅ UPDATED BARCODE
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: id,
-      scale: 3,
+      text: url,        // 1. SCANS AS URL (Opens Browser)
+      alttext: id,      // 2. SHOWS SHORT ID (Clean Look)
+      scale: 1,         // 3. REDUCED SCALE (Long URL needs smaller bars to fit)
       height: 25,
       includetext: true,
       textxalign: "center",
@@ -194,7 +194,6 @@ app.post("/create", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 // ==============================
 // SEND EMAIL
 // ==============================
