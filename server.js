@@ -716,7 +716,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
   <!-- SCANNER INPUT (Visible for scanning) -->
   <div class="scanner-box">
-    <input type="text" id="scanInput" placeholder="Scan Barcode..." autocomplete="off" />
+    <input type="text" id="scanInput" placeholder="Scan Barcode..." autocomplete="off" spellcheck="false" />
   </div>
 
   <div class="card">
@@ -755,19 +755,23 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   <script>
     const input = document.getElementById('scanInput');
     const error = document.getElementById('error-display');
-    const card = document.querySelector('.card');
 
-    // 1. Focus input on load
-    window.onload = () => input.focus();
-    
-    // 2. Focus input on click
-    document.addEventListener('click', () => input.focus());
+    // ✅ CRITICAL FIX: Force Focus Loop
+    // This runs every 100ms to ensure focus is ALWAYS on the input
+    setInterval(() => {
+      if (document.activeElement !== input) {
+        input.focus();
+      }
+    }, 100);
 
-    // 3. Listen for Enter key (Scan Complete)
-    input.addEventListener('keypress', async function (e) {
-      if (e.key === 'Enter') {
+    // Listen for Enter key (Scan Complete)
+    input.addEventListener('keydown', async function (e) {
+      // Supports Enter or Tab keys at end of scan
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault(); // Prevent tab from moving focus
+        
         const id = input.value.trim();
-        input.value = ''; // Clear input for next scan
+        input.value = ''; // Clear input immediately
         
         if (id) {
           // Update URL without reloading (pushState)
@@ -776,8 +780,6 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           // Fetch new data
           await loadUserData(id);
         }
-        
-        input.focus(); // Keep focus ready
       }
     });
 
@@ -821,7 +823,6 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
     res.send("Error loading user");
   }
 });
-
 // ==============================
 // 🚀 START SERVER
 // ==============================
