@@ -239,7 +239,7 @@ app.post("/create", async (req, res) => {
 });
 
 // ==============================
-// 📲 SCANNER ENTRY PAGE (SPA)
+// 📲 SCANNER ENTRY PAGE (SPA) - FIXED
 // ==============================
 app.get("/scan", (req, res) => {
   res.send(`
@@ -253,6 +253,7 @@ app.get("/scan", (req, res) => {
       font-family: 'Poppins', sans-serif;
       background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
@@ -328,7 +329,7 @@ app.get("/scan", (req, res) => {
 <body>
 
   <div class="scanner-box">
-    <input type="text" id="scanInput" placeholder="Scan Barcode..." autofocus autocomplete="off" />
+    <input type="text" id="scanInput" placeholder="Scan Barcode..." autocomplete="off" />
   </div>
 
   <div id="user-card">
@@ -355,10 +356,17 @@ app.get("/scan", (req, res) => {
     const card = document.getElementById('user-card');
     const error = document.getElementById('error-display');
 
+    // ✅ FIX 1: Force focus when page loads
+    window.onload = () => input.focus();
+
+    // ✅ FIX 2: Force focus if user clicks anywhere on the page
+    document.addEventListener('click', () => input.focus());
+
+    // Listen for scanner input (Enter key)
     input.addEventListener('keypress', async function (e) {
       if (e.key === 'Enter') {
         const id = input.value.trim();
-        input.value = '';
+        input.value = ''; // Clear input immediately
         
         if (id) {
           // 1. Update Browser URL (No Reload)
@@ -366,6 +374,9 @@ app.get("/scan", (req, res) => {
           // 2. Load Data
           await loadUserData(id);
         }
+
+        // ✅ FIX 3: Put focus back on input for NEXT scan
+        input.focus();
       }
     });
 
