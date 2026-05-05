@@ -104,8 +104,8 @@ async function generateFinalImage(id) {
       throw new Error("QR or Barcode file missing");
     }
 
-    const qr = await loadImage(qrPath);
-    const barcode = await loadImage(barcode);
+ const qr = await loadImage(qrPath);
+const barcode = await loadImage(barPath);
 
     // HD SCALE
     const scale = 2;
