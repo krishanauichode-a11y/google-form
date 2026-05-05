@@ -2,8 +2,7 @@ const express = require("express");
 const { Pool } = require("pg");
 const QRCode = require("qrcode");
 const bwipjs = require("bwip-js");
-// const { v4: uuidv4 } = require("uuid"); // ❌ REMOVED
-const crypto = require("crypto"); // ✅ ADDED
+const crypto = require("crypto");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
@@ -52,14 +51,13 @@ console.log("📁 Temp directory:", tempDir);
 app.use("/temp", express.static(tempDir));
 
 // ==============================
-// 🔢 SHORT ID GENERATOR (NEW)
+// 🔢 SHORT ID GENERATOR
 // ==============================
 function generateShortId() {
   const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const randomBytes = crypto.randomBytes(7); // Generate 7 random bytes
+  const randomBytes = crypto.randomBytes(7);
   let result = "";
   for (let i = 0; i < 7; i++) {
-    // Map byte value (0-255) to char index (0-35)
     result += chars[randomBytes[i] % chars.length];
   }
   return result;
@@ -73,7 +71,16 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (OPTIMIZED)
+// 🔗 SHORT REDIRECT ROUTE (NEW)
+// ==============================
+// This handles the short barcode scanning and redirects to the full page
+app.get("/s/:id", (req, res) => {
+  const shortId = req.params.id;
+  res.redirect(`https://google-form-kebh.onrender.com/user/${shortId}`);
+});
+
+// ==============================
+// 🎟️ GENERATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -133,7 +140,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER
+// 👤 CREATE USER (UPDATED)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -162,6 +169,7 @@ app.post("/create", async (req, res) => {
       ]
     );
 
+    // Full URL for QR Code
     const url = `https://google-form-kebh.onrender.com/user/${id}`;
 
     // HIGH QUALITY QR
@@ -172,12 +180,16 @@ app.post("/create", async (req, res) => {
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // ✅ UPDATED BARCODE
+    // ✅ UPDATED BARCODE LOGIC
+    // We use the short route '/s/' to keep the barcode width manageable
+    // We use https:// to ensure the scanner detects it as a link immediately
+    const shortUrl = `https://google-form-kebh.onrender.com/s/${id}`;
+
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: url,        // 1. SCANS AS URL (Opens Browser)
-      alttext: id,      // 2. SHOWS SHORT ID (Clean Look)
-      scale: 1,         // 3. REDUCED SCALE (Long URL needs smaller bars to fit)
+      text: shortUrl,    // SCAN: Encodes the short URL
+      alttext: id,       // LOOK: Prints only the Short ID
+      scale: 1,          // SIZE: Scale 1 ensures the long URL fits inside the card width
       height: 25,
       includetext: true,
       textxalign: "center",
@@ -194,6 +206,7 @@ app.post("/create", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 // ==============================
 // SEND EMAIL
 // ==============================
