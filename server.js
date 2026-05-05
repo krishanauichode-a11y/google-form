@@ -140,7 +140,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER (UPDATED)
+// 👤 CREATE USER (AUTO SHORTENER)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -169,27 +169,37 @@ app.post("/create", async (req, res) => {
       ]
     );
 
-    // Full URL for QR Code
-    const url = `https://google-form-kebh.onrender.com/user/${id}`;
+    const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // HIGH QUALITY QR
-    const qrBuffer = await QRCode.toBuffer(url, {
+    // HIGH QUALITY QR (Uses the Long URL)
+    const qrBuffer = await QRCode.toBuffer(longUrl, {
       width: 600, 
       margin: 2,
       errorCorrectionLevel: 'H' 
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // ✅ UPDATED BARCODE LOGIC
-    // We use the short route '/s/' to keep the barcode width manageable
-    // We use https:// to ensure the scanner detects it as a link immediately
-    const shortUrl = `https://google-form-kebh.onrender.com/s/${id}`;
+    // ✅ MAGIC: CREATE SHORT URL FOR BARCODE
+    let barcodeText = longUrl;
+    try {
+      // We use is.gd API to get a tiny link (e.g., https://is.gd/A1B2C)
+      const response = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`);
+      if (response.ok) {
+        const shortLink = await response.text();
+        barcodeText = shortLink; // Use the tiny link
+        console.log("Short URL generated:", shortLink);
+      }
+    } catch (e) {
+      console.log("Could not generate short URL, using long URL");
+      // If API fails, we fallback to longUrl (it just means barcode will be long)
+    }
 
+    // GENERATE BARCODE
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: shortUrl,    // SCAN: Encodes the short URL
-      alttext: id,       // LOOK: Prints only the Short ID
-      scale: 1,          // SIZE: Scale 1 ensures the long URL fits inside the card width
+      text: barcodeText,  // Encodes the tiny link -> Very Short Barcode!
+      alttext: id,        // Prints Short ID -> Clean Look
+      scale: 2,           // Thick lines for reliable scanning
       height: 25,
       includetext: true,
       textxalign: "center",
