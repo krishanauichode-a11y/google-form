@@ -550,7 +550,7 @@ function checkAdmin(req, res) {
 }
 
 // ==============================
-// 👤 USER PAGE (PROTECTED)
+// 👤 USER PAGE (PROTECTED & SCANNER ENABLED)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -587,11 +587,32 @@ app.get("/user/:id", async (req, res) => {
 body {
   background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
   display:flex;
+  flex-direction: column;
   justify-content:center;
   align-items:center;
   min-height:100vh;
   padding:15px;
 }
+
+/* SCANNER INPUT BOX */
+.scanner-box {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+input#scanInput {
+  padding: 10px;
+  font-size: 18px;
+  width: 300px;
+  text-align: center;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  outline: none;
+}
+input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
 .card {
   width:100%;
@@ -675,6 +696,8 @@ body {
   font-weight:600;
 }
 
+.error-msg { color: #ff4444; font-size: 18px; font-weight: 600; display: none; margin-top:10px;}
+
 /* MOBILE OPTIMIZATION */
 @media(max-width:400px){
   .info {
@@ -691,37 +714,103 @@ body {
 
 <body>
 
-<div class="card">
-
-  <div class="card-header">
-  <h2>TUSHAR BHUMKAR INSTITUTE</h2>
-    <h2>Student Entry Pass</h2>
-    <div class="badge">✔ VERIFIED</div>
+  <!-- SCANNER INPUT (Visible for scanning) -->
+  <div class="scanner-box">
+    <input type="text" id="scanInput" placeholder="Scan Barcode..." autocomplete="off" />
   </div>
 
-  <div class="card-body">
+  <div class="card">
 
-    <div class="info"><span>Name</span><span>${u.full_name}</span></div>
-    <div class="info"><span>Email</span><span>${u.email}</span></div>
-    <div class="info"><span>Phone</span><span>${u.phone}</span></div>
-    <div class="info"><span>DOB</span><span>${u.dob}</span></div>
-    <div class="info"><span>Market</span><span>${u.trading_market}</span></div>
-    <div class="info"><span>Type</span><span>${u.trading_type}</span></div>
-    <div class="info"><span>Source</span><span>${u.source}</span></div>
-    <div class="info"><span>Software</span><span>${u.software_used}</span></div>
-    <div class="info"><span>Level</span><span>${u.level}</span></div>
-    <div class="info"><span>Paid</span><span>₹ ${u.amount}</span></div>
-    <div class="info"><span>Mode</span><span>${u.payment_mode}</span></div>
+    <div class="card-header">
+    <h2>TUSHAR BHUMKAR INSTITUTE</h2>
+      <h2>Student Entry Pass</h2>
+      <div class="badge">✔ VERIFIED</div>
+    </div>
 
-    <div class="status">✔ Valid Entry Approved</div>
+    <div class="card-body">
+      <!-- Added IDs to spans so JavaScript can update them -->
+      <div class="info"><span>Name</span><span id="u-full_name">${u.full_name}</span></div>
+      <div class="info"><span>Email</span><span id="u-email">${u.email}</span></div>
+      <div class="info"><span>Phone</span><span id="u-phone">${u.phone}</span></div>
+      <div class="info"><span>DOB</span><span id="u-dob">${u.dob}</span></div>
+      <div class="info"><span>Market</span><span id="u-market">${u.trading_market}</span></div>
+      <div class="info"><span>Type</span><span id="u-type">${u.trading_type}</span></div>
+      <div class="info"><span>Source</span><span id="u-source">${u.source}</span></div>
+      <div class="info"><span>Software</span><span id="u-software">${u.software_used}</span></div>
+      <div class="info"><span>Level</span><span id="u-level">${u.level}</span></div>
+      <div class="info"><span>Paid</span><span id="u-amount">₹ ${u.amount}</span></div>
+      <div class="info"><span>Mode</span><span id="u-mode">${u.payment_mode}</span></div>
+
+      <div class="status">✔ Valid Entry Approved</div>
+      <div id="error-display" class="error-msg">❌ Invalid ID</div>
+
+    </div>
+
+    <div class="card-footer">
+      Scan QR / Barcode at Entry Gate
+    </div>
 
   </div>
 
-  <div class="card-footer">
-    Scan QR / Barcode at Entry Gate
-  </div>
+  <script>
+    const input = document.getElementById('scanInput');
+    const error = document.getElementById('error-display');
+    const card = document.querySelector('.card');
 
-</div>
+    // 1. Focus input on load
+    window.onload = () => input.focus();
+    
+    // 2. Focus input on click
+    document.addEventListener('click', () => input.focus());
+
+    // 3. Listen for Enter key (Scan Complete)
+    input.addEventListener('keypress', async function (e) {
+      if (e.key === 'Enter') {
+        const id = input.value.trim();
+        input.value = ''; // Clear input for next scan
+        
+        if (id) {
+          // Update URL without reloading (pushState)
+          window.history.pushState({ id: id }, "", "/user/" + id);
+          
+          // Fetch new data
+          await loadUserData(id);
+        }
+        
+        input.focus(); // Keep focus ready
+      }
+    });
+
+    async function loadUserData(id) {
+      try {
+        const res = await fetch('/api/user/' + id);
+        const json = await res.json();
+
+        if (json.success) {
+          const u = json.data;
+          error.style.display = 'none';
+          
+          // Update DOM elements with new data
+          document.getElementById('u-full_name').innerText = u.full_name;
+          document.getElementById('u-email').innerText = u.email;
+          document.getElementById('u-phone').innerText = u.phone;
+          document.getElementById('u-dob').innerText = u.dob;
+          document.getElementById('u-market').innerText = u.trading_market;
+          document.getElementById('u-type').innerText = u.trading_type;
+          document.getElementById('u-source').innerText = u.source;
+          document.getElementById('u-software').innerText = u.software_used;
+          document.getElementById('u-level').innerText = u.level;
+          document.getElementById('u-amount').innerText = '₹ ' + u.amount;
+          document.getElementById('u-mode').innerText = u.payment_mode;
+
+        } else {
+          error.style.display = 'block';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  </script>
 
 </body>
 </html>
