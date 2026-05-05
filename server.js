@@ -679,6 +679,11 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           <div class="info-label">Mode</div>
           <div class="info-value" id="u-mode">${u.payment_mode}</div>
         </div>
+
+        <div class="info-item">
+  <div class="info-label">Course Type</div>
+  <div class="info-value" id="u-course">${u.course_type}</div>
+</div>
       </div>
 
       <div style="margin-top:25px;">
@@ -764,8 +769,9 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           document.getElementById('u-level').innerText = u.level;
           document.getElementById('u-amount').innerText = '₹ ' + u.amount;
           document.getElementById('u-mode').innerText = u.payment_mode;
-          document.getElementById('u-selfie').src = u.selfie_image || '';
-          document.getElementById('u-payment').src = u.payment_image || '';
+          document.getElementById('u-selfie').src = u.selfie_image;
+          document.getElementById('u-payment').src = u.payment_image;
+          document.getElementById('u-course').innerText = u.course_type;
 
         } else {
           error.style.display = 'block';
