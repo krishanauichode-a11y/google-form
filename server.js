@@ -207,13 +207,12 @@ app.post("/create", async (req, res) => {
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // ✅ 7-CHARACTER BARCODE
-    const barcodeBuffer = await bwipjs.toBuffer({
+ const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: id,          // 1. Contains ONLY the 7 characters
-      alttext: id,       // 2. Prints the 7 characters
-      scale: 3,          // 3. High scale = Thick lines (Very easy to scan)
-      height: 50,        // 4. Tall bars for better visibility
+      text: barcodeText,  // Encodes the tiny link -> Very Short Barcode!
+      alttext: id,        // Prints Short ID -> Clean Look
+      scale: 2,           // Thick lines for reliable scanning
+      height: 25,
       includetext: true,
       textxalign: "center",
       padding: 10
