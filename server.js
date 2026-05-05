@@ -71,13 +71,6 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// 🔗 SHORT REDIRECT
-// ==============================
-app.get("/s/:id", (req, res) => {
-  res.redirect(`https://google-form-kebh.onrender.com/user/${req.params.id}`);
-});
-
-// ==============================
 // 📡 API: GET USER DATA (JSON)
 // ==============================
 app.get("/api/user/:id", async (req, res) => {
@@ -112,7 +105,7 @@ async function generateFinalImage(id) {
     }
 
     const qr = await loadImage(qrPath);
-    const barcode = await loadImage(barPath);
+    const barcode = await loadImage(barcode);
 
     // HD SCALE
     const scale = 2;
@@ -189,21 +182,22 @@ app.post("/create", async (req, res) => {
       ]
     );
 
-    const url = `https://google-form-kebh.onrender.com/user/${id}`;
+    const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // HIGH QUALITY QR
-    const qrBuffer = await QRCode.toBuffer(url, {
+    // HIGH QUALITY QR (Contains full URL to open directly on phone)
+    const qrBuffer = await QRCode.toBuffer(longUrl, {
       width: 600, 
       margin: 2,
       errorCorrectionLevel: 'H' 
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // HIGH QUALITY BARCODE
+    // ✅ BARCODE (Contains ONLY ID, no URL)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: id,
-      scale: 3,
+      text: id,          // 1. Encodes ONLY the 7-char ID
+      alttext: id,       // 2. Prints ONLY the 7-char ID
+      scale: 3,          // 3. Thick lines for easy scanning
       height: 25,
       includetext: true,
       textxalign: "center",
