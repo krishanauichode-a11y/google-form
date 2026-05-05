@@ -157,36 +157,30 @@ async function generateFinalImage(id) {
 // ==============================
 app.post("/create", async (req, res) => {
   try {
-const {
-  fullName, address, email, phone, dob, date,
-  tradingMarket, tradingType, source,
-  softwareUsed, previousCourse, level,
-  amount, paymentMode,
-  selfieImage, paymentImage,
-  courseType   // ✅ MUST BE HERE
-} = req.body;
+    const {
+      fullName, address, email, phone, dob, date,
+      tradingMarket, tradingType, source,
+      softwareUsed, previousCourse, level,
+      amount, paymentMode
+    } = req.body;
 
     const id = generateShortId(); 
 
-await pool.query(
-  `INSERT INTO users(
-    id, full_name, address, email, phone, dob, date,
-    trading_market, trading_type, source,
-    software_used, previous_course, level,
-    amount, payment_mode,
-    selfie_image, payment_image,
-    course_type
-  )
-  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-  [
-    id, fullName, address, email, phone, dob, date,
-    tradingMarket, tradingType, source,
-    softwareUsed, previousCourse, level,
-    amount, paymentMode,
-    selfieImage, paymentImage,
-    courseType   // ✅ NEW FIELD
-  ]
-);
+    await pool.query(
+      `INSERT INTO users(
+        id, full_name, address, email, phone, dob, date,
+        trading_market, trading_type, source,
+        software_used, previous_course, level,
+        amount, payment_mode
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      [
+        id, fullName, address, email, phone, dob, date,
+        tradingMarket, tradingType, source,
+        softwareUsed, previousCourse, level,
+        amount, paymentMode
+      ]
+    );
 
     const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
@@ -399,42 +393,34 @@ body {
   justify-content:center;
   align-items:center;
   min-height:100vh;
-  padding:20px;
+  padding:15px;
 }
 
 /* SCANNER INPUT BOX */
 .scanner-box {
   margin-bottom: 20px;
   text-align: center;
-  width: 100%;
-  max-width: 500px;
 }
 
 input#scanInput {
-  padding: 12px 20px;
+  padding: 10px;
   font-size: 18px;
-  width: 100%;
+  width: 300px;
   text-align: center;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.2);
   color: #fff;
   border: 1px solid rgba(255,255,255,0.3);
   outline: none;
-  transition: all 0.3s ease;
-}
-input#scanInput:focus {
-  background: rgba(255,255,255,0.25);
-  border-color: rgba(255,255,255,0.5);
-  box-shadow: 0 0 15px rgba(255,255,255,0.2);
 }
 input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
 .card {
   width:100%;
-  max-width: 1000px;
+  max-width:420px;
   background:#ffffff;
-  border-radius: 20px;
+  border-radius:20px;
   overflow:hidden;
   box-shadow:0 15px 40px rgba(0,0,0,0.4);
   animation: fadeIn 0.6s ease;
@@ -450,165 +436,79 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   background: linear-gradient(135deg, #00c853, #009624);
   color:#fff;
   text-align:center;
-  padding: 25px;
+  padding:20px;
 }
 
 .card-header h2 {
-  font-size: 24px;
+  font-size:22px;
   font-weight:600;
-  margin-bottom: 10px;
 }
 
 .badge {
   background:#fff;
   color:#00c853;
   display:inline-block;
-  padding:6px 14px;
+  padding:5px 12px;
   border-radius:20px;
-  font-size:14px;
+  font-size:12px;
+  margin-top:8px;
   font-weight:600;
 }
 
 /* BODY */
 .card-body {
-  padding:25px;
+  padding:20px;
 }
 
-.info-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-  width: 100%;
+.info {
+  display:flex;
+  justify-content:space-between;
+  padding:10px 0;
+  border-bottom:1px solid #eee;
+  font-size:14px;
 }
 
-.info-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.info-label {
+.info span:first-child {
   color:#555;
   font-weight:500;
-  font-size:14px;
-  margin-bottom: 5px;
 }
 
-.info-value {
+.info span:last-child {
   font-weight:600;
   color:#222;
-  font-size:14px;
-  padding: 8px 12px;
-  background-color: rgba(0,200,83,0.05);
-  border-radius: 6px;
-  transition: background-color 0.3s ease;
-  word-wrap: break-word;
-  min-height: 40px;
-}
-
-.info-item:hover .info-value {
-  background-color: rgba(0,200,83,0.1);
+  text-align:right;
+  max-width:55%;
+  word-wrap:break-word;
 }
 
 /* FOOTER */
 .card-footer {
   text-align:center;
-  padding:20px;
-  font-size:14px;
+  padding:15px;
+  font-size:12px;
   color:#777;
-  border-top: 1px solid #eee;
 }
 
 /* STATUS */
 .status {
   text-align:center;
-  margin-top:20px;
-  font-size:16px;
+  margin-top:10px;
+  font-size:13px;
   color:#00c853;
   font-weight:600;
-  padding:12px;
-  border-radius:8px;
-  background-color: rgba(0,200,83,0.1);
 }
 
-.error-msg { 
-  color: #ff4444; 
-  font-size: 16px; 
-  font-weight: 600; 
-  display: none; 
-  margin-top:20px;
-  padding:12px;
-  border-radius:8px;
-  background-color: rgba(255,68,68,0.1);
-}
-
-/* DESKTOP OPTIMIZATION */
-@media(min-width:768px){
-  .scanner-box {
-    margin-bottom: 30px;
-  }
-  
-  input#scanInput {
-    font-size: 20px;
-  }
-  
-  .card {
-    max-width: 1200px;
-  }
-  
-  .card-header {
-    padding: 30px;
-  }
-  
-  .card-header h2 {
-    font-size: 28px;
-  }
-  
-  .card-body {
-    padding: 30px;
-  }
-  
-  .info-container {
-    gap: 20px;
-  }
-  
-  .info-label {
-    font-size: 16px;
-  }
-  
-  .info-value {
-    font-size: 16px;
-    padding: 10px 15px;
-    min-height: 45px;
-  }
-  
-  .status {
-    font-size: 18px;
-  }
-}
+.error-msg { color: #ff4444; font-size: 18px; font-weight: 600; display: none; margin-top:10px;}
 
 /* MOBILE OPTIMIZATION */
-@media(max-width:767px){
-  .card {
-    max-width: 100%;
+@media(max-width:400px){
+  .info {
+    flex-direction:column;
+    gap:3px;
   }
-  
-  .info-container {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  
-  .info-item {
-    margin-bottom: 0;
-  }
-  
-  .info-label {
-    margin-bottom: 5px;
-    font-size: 14px;
-  }
-  
-  .info-value {
-    padding: 8px;
-    font-size: 14px;
+
+  .info span:last-child {
+    text-align:left;
   }
 }
 </style>
@@ -630,75 +530,18 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
     </div>
 
     <div class="card-body">
-      <!-- Grid layout with 3 columns -->
-      <div class="info-container">
-        <div class="info-item">
-          <div class="info-label">Name</div>
-          <div class="info-value" id="u-full_name">${u.full_name}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Email</div>
-          <div class="info-value" id="u-email">${u.email}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Phone</div>
-          <div class="info-value" id="u-phone">${u.phone}</div>
-        </div>
-        
-        <div class="info-item">
-          <div class="info-label">DOB</div>
-          <div class="info-value" id="u-dob">${u.dob}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Market</div>
-          <div class="info-value" id="u-market">${u.trading_market}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Type</div>
-          <div class="info-value" id="u-type">${u.trading_type}</div>
-        </div>
-        
-        <div class="info-item">
-          <div class="info-label">Source</div>
-          <div class="info-value" id="u-source">${u.source}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Software</div>
-          <div class="info-value" id="u-software">${u.software_used}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Level</div>
-          <div class="info-value" id="u-level">${u.level}</div>
-        </div>
-        
-        <div class="info-item">
-          <div class="info-label">Paid</div>
-          <div class="info-value" id="u-amount">₹ ${u.amount}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Mode</div>
-          <div class="info-value" id="u-mode">${u.payment_mode}</div>
-        </div>
-      </div>
-     <div style="margin-top:25px;">
-  <h3 style="margin-bottom:10px;">Verification</h3>
-
-  <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
-    
-    <div style="text-align:center;">
-      <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
-      <img id="u-selfie" src="${u.selfie_image}" 
-           style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
-    </div>
-
-    <div style="text-align:center;">
-      <div style="font-size:14px; margin-bottom:5px;">Payment</div>
-      <img id="u-payment" src="${u.payment_image}" 
-           style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
-    </div>
-
-  </div>
-</div>
+      <!-- Added IDs to spans so JavaScript can update them -->
+      <div class="info"><span>Name</span><span id="u-full_name">${u.full_name}</span></div>
+      <div class="info"><span>Email</span><span id="u-email">${u.email}</span></div>
+      <div class="info"><span>Phone</span><span id="u-phone">${u.phone}</span></div>
+      <div class="info"><span>DOB</span><span id="u-dob">${u.dob}</span></div>
+      <div class="info"><span>Market</span><span id="u-market">${u.trading_market}</span></div>
+      <div class="info"><span>Type</span><span id="u-type">${u.trading_type}</span></div>
+      <div class="info"><span>Source</span><span id="u-source">${u.source}</span></div>
+      <div class="info"><span>Software</span><span id="u-software">${u.software_used}</span></div>
+      <div class="info"><span>Level</span><span id="u-level">${u.level}</span></div>
+      <div class="info"><span>Paid</span><span id="u-amount">₹ ${u.amount}</span></div>
+      <div class="info"><span>Mode</span><span id="u-mode">${u.payment_mode}</span></div>
 
       <div class="status">✔ Valid Entry Approved</div>
       <div id="error-display" class="error-msg">❌ Invalid ID</div>
@@ -763,8 +606,6 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           document.getElementById('u-level').innerText = u.level;
           document.getElementById('u-amount').innerText = '₹ ' + u.amount;
           document.getElementById('u-mode').innerText = u.payment_mode;
-          document.getElementById('u-selfie').src = u.selfie_image || '';
-          document.getElementById('u-payment').src = u.payment_image || '';
 
         } else {
           error.style.display = 'block';
