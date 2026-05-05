@@ -157,30 +157,34 @@ async function generateFinalImage(id) {
 // ==============================
 app.post("/create", async (req, res) => {
   try {
-    const {
-      fullName, address, email, phone, dob, date,
-      tradingMarket, tradingType, source,
-      softwareUsed, previousCourse, level,
-      amount, paymentMode
-    } = req.body;
+const {
+  fullName, address, email, phone, dob, date,
+  tradingMarket, tradingType, source,
+  softwareUsed, previousCourse, level,
+  amount, paymentMode,
+  selfieImage, paymentImage,
+  courseType   // ✅ MUST BE HERE
+} = req.body;
 
     const id = generateShortId(); 
 
-  await pool.query(
+await pool.query(
   `INSERT INTO users(
     id, full_name, address, email, phone, dob, date,
     trading_market, trading_type, source,
     software_used, previous_course, level,
     amount, payment_mode,
-    selfie_image, payment_image
+    selfie_image, payment_image,
+    course_type
   )
-  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
   [
     id, fullName, address, email, phone, dob, date,
     tradingMarket, tradingType, source,
     softwareUsed, previousCourse, level,
     amount, paymentMode,
-    selfieImage, paymentImage   // ✅ NEW
+    selfieImage, paymentImage,
+    courseType   // ✅ NEW FIELD
   ]
 );
 
