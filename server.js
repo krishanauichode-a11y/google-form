@@ -38,7 +38,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// 📁 TEMP STORAGE
+// 📁 TEMP STORAGE (FIXED FOR RENDER)
 // ==============================
 const tempDir = path.join(os.tmpdir(), "temp_passes");
 
@@ -71,10 +71,11 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// 🔗 SHORT REDIRECT (OPTIONAL)
+// 🔗 SHORT REDIRECT ROUTE
 // ==============================
 app.get("/s/:id", (req, res) => {
-  res.redirect(`https://google-form-kebh.onrender.com/user/${req.params.id}`);
+  const shortId = req.params.id;
+  res.redirect(`https://google-form-kebh.onrender.com/user/${shortId}`);
 });
 
 // ==============================
@@ -100,7 +101,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (FIXED)
+// 🎟️ GENERATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -136,16 +137,8 @@ async function generateFinalImage(id) {
     ctx.fillText("ENTRY PASS", 230, 120);
 
     // Images
-    
-    // 1. Draw QR Code (Fixed size)
     ctx.drawImage(qr, 200, 160, 300, 300);
-
-    // 2. Draw Barcode (Dynamic Height to prevent distortion)
-    const targetWidth = 600; 
-    const widthRatio = targetWidth / barcode.width;
-    const targetHeight = barcode.height * widthRatio;
-    
-    ctx.drawImage(barcode, 50, 500, targetWidth, targetHeight);
+    ctx.drawImage(barcode, 50, 500, 600, 180);
 
     // Footer
     ctx.font = "18px sans-serif";
@@ -168,7 +161,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER (7-CHAR BARCODE)
+// 👤 CREATE USER (AUTO SHORTENER)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -199,7 +192,7 @@ app.post("/create", async (req, res) => {
 
     const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // HIGH QUALITY QR
+    // HIGH QUALITY QR (Uses the Long URL)
     const qrBuffer = await QRCode.toBuffer(longUrl, {
       width: 600, 
       margin: 2,
@@ -207,7 +200,23 @@ app.post("/create", async (req, res) => {
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
- const barcodeBuffer = await bwipjs.toBuffer({
+    // ✅ MAGIC: CREATE SHORT URL FOR BARCODE
+    let barcodeText = longUrl;
+    try {
+      // We use is.gd API to get a tiny link (e.g., https://is.gd/A1B2C)
+      const response = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`);
+      if (response.ok) {
+        const shortLink = await response.text();
+        barcodeText = shortLink; // Use the tiny link
+        console.log("Short URL generated:", shortLink);
+      }
+    } catch (e) {
+      console.log("Could not generate short URL, using long URL");
+      // If API fails, we fallback to longUrl (it just means barcode will be long)
+    }
+
+    // GENERATE BARCODE
+    const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
       text: barcodeText,  // Encodes the tiny link -> Very Short Barcode!
       alttext: id,        // Prints Short ID -> Clean Look
@@ -248,6 +257,7 @@ app.get("/scan", (req, res) => {
       align-items: center;
       min-height: 100vh;
       margin: 0;
+      padding: 15px;
     }
 
     .scanner-box {
