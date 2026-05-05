@@ -38,7 +38,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// 📁 TEMP STORAGE (FIXED FOR RENDER)
+// 📁 TEMP STORAGE
 // ==============================
 const tempDir = path.join(os.tmpdir(), "temp_passes");
 
@@ -71,16 +71,36 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// 🔗 SHORT REDIRECT ROUTE (NEW)
+// 🔗 SHORT REDIRECT (OPTIONAL)
 // ==============================
-// This handles the short barcode scanning and redirects to the full page
 app.get("/s/:id", (req, res) => {
-  const shortId = req.params.id;
-  res.redirect(`https://google-form-kebh.onrender.com/user/${shortId}`);
+  res.redirect(`https://google-form-kebh.onrender.com/user/${req.params.id}`);
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE
+// 📡 API: GET USER DATA (JSON)
+// ==============================
+app.get("/api/user/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: false });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false });
+  }
+});
+
+// ==============================
+// 🎟️ GENERATE FINAL IMAGE (FIXED)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -116,8 +136,16 @@ async function generateFinalImage(id) {
     ctx.fillText("ENTRY PASS", 230, 120);
 
     // Images
+    
+    // 1. Draw QR Code (Fixed size)
     ctx.drawImage(qr, 200, 160, 300, 300);
-    ctx.drawImage(barcode, 50, 500, 600, 180);
+
+    // 2. Draw Barcode (Dynamic Height to prevent distortion)
+    const targetWidth = 600; 
+    const widthRatio = targetWidth / barcode.width;
+    const targetHeight = barcode.height * widthRatio;
+    
+    ctx.drawImage(barcode, 50, 500, targetWidth, targetHeight);
 
     // Footer
     ctx.font = "18px sans-serif";
@@ -140,7 +168,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER (AUTO SHORTENER)
+// 👤 CREATE USER (7-CHAR BARCODE)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -171,7 +199,7 @@ app.post("/create", async (req, res) => {
 
     const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // HIGH QUALITY QR (Uses the Long URL)
+    // HIGH QUALITY QR
     const qrBuffer = await QRCode.toBuffer(longUrl, {
       width: 600, 
       margin: 2,
@@ -179,28 +207,13 @@ app.post("/create", async (req, res) => {
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // ✅ MAGIC: CREATE SHORT URL FOR BARCODE
-    let barcodeText = longUrl;
-    try {
-      // We use is.gd API to get a tiny link (e.g., https://is.gd/A1B2C)
-      const response = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`);
-      if (response.ok) {
-        const shortLink = await response.text();
-        barcodeText = shortLink; // Use the tiny link
-        console.log("Short URL generated:", shortLink);
-      }
-    } catch (e) {
-      console.log("Could not generate short URL, using long URL");
-      // If API fails, we fallback to longUrl (it just means barcode will be long)
-    }
-
-    // GENERATE BARCODE
+    // ✅ 7-CHARACTER BARCODE
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: barcodeText,  // Encodes the tiny link -> Very Short Barcode!
-      alttext: id,        // Prints Short ID -> Clean Look
-      scale: 2,           // Thick lines for reliable scanning
-      height: 25,
+      text: id,          // 1. Contains ONLY the 7 characters
+      alttext: id,       // 2. Prints the 7 characters
+      scale: 3,          // 3. High scale = Thick lines (Very easy to scan)
+      height: 50,        // 4. Tall bars for better visibility
       includetext: true,
       textxalign: "center",
       padding: 10
@@ -215,6 +228,169 @@ app.post("/create", async (req, res) => {
     console.error("❌ CREATE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ==============================
+// 📲 SCANNER ENTRY PAGE (SPA)
+// ==============================
+app.get("/scan", (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Scanner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .scanner-box {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    input {
+      padding: 15px;
+      font-size: 24px;
+      width: 300px;
+      text-align: center;
+      border: none;
+      border-radius: 8px;
+      outline: none;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    input::placeholder { color: rgba(255,255,255,0.5); }
+
+    #user-card {
+      width: 100%;
+      max-width: 420px;
+      background: #ffffff;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+      display: none; 
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-header {
+      background: linear-gradient(135deg, #00c853, #009624);
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .card-header h2 { font-size: 22px; font-weight: 600; }
+    
+    .badge {
+      background: #fff; color: #00c853;
+      display: inline-block; padding: 5px 12px;
+      border-radius: 20px; font-size: 12px;
+      margin-top: 8px; font-weight: 600;
+    }
+
+    .card-body { padding: 20px; }
+    
+    .info {
+      display: flex; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+    .info span:last-child { font-weight: 600; color: #222; text-align: right; }
+    
+    .error-msg { color: #ff4444; font-size: 18px; font-weight: 600; display: none; }
+
+  </style>
+</head>
+<body>
+
+  <div class="scanner-box">
+    <input type="text" id="scanInput" placeholder="Scan Barcode..." autofocus autocomplete="off" />
+  </div>
+
+  <div id="user-card">
+    <div class="card-header">
+      <h2>TUSHAR BHUMKAR INSTITUTE</h2>
+      <h2>Student Entry Pass</h2>
+      <div class="badge">✔ VERIFIED</div>
+    </div>
+    <div class="card-body">
+      <div class="info"><span>Name</span><span id="u-name">-</span></div>
+      <div class="info"><span>Email</span><span id="u-email">-</span></div>
+      <div class="info"><span>Phone</span><span id="u-phone">-</span></div>
+      <div class="info"><span>Market</span><span id="u-market">-</span></div>
+      <div class="info"><span>Level</span><span id="u-level">-</span></div>
+      <div class="info"><span>Paid</span><span id="u-amount">-</span></div>
+      <div style="text-align:center; margin-top:15px; color:#00c853; font-weight:600;">✔ Valid Entry Approved</div>
+    </div>
+  </div>
+
+  <div id="error-display" class="error-msg">❌ Invalid ID</div>
+
+  <script>
+    const input = document.getElementById('scanInput');
+    const card = document.getElementById('user-card');
+    const error = document.getElementById('error-display');
+
+    input.addEventListener('keypress', async function (e) {
+      if (e.key === 'Enter') {
+        const id = input.value.trim();
+        input.value = '';
+        
+        if (id) {
+          // 1. Update Browser URL (No Reload)
+          window.history.pushState({ id: id }, "", "/user/" + id);
+          // 2. Load Data
+          await loadUserData(id);
+        }
+      }
+    });
+
+    async function loadUserData(id) {
+      try {
+        const res = await fetch('/api/user/' + id);
+        const json = await res.json();
+
+        if (json.success) {
+          const u = json.data;
+          
+          error.style.display = 'none';
+          card.style.display = 'block';
+
+          document.getElementById('u-name').innerText = u.full_name;
+          document.getElementById('u-email').innerText = u.email;
+          document.getElementById('u-phone').innerText = u.phone;
+          document.getElementById('u-market').innerText = u.trading_market;
+          document.getElementById('u-level').innerText = u.level;
+          document.getElementById('u-amount').innerText = '₹ ' + u.amount;
+
+        } else {
+          card.style.display = 'none';
+          error.style.display = 'block';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  </script>
+
+</body>
+</html>
+  `);
 });
 
 // ==============================
