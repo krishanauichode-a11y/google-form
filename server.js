@@ -394,19 +394,21 @@ body {
   align-items:center;
   min-height:100vh;
   padding:15px;
+  overflow-x: hidden;
 }
 
 /* SCANNER INPUT BOX */
 .scanner-box {
   margin-bottom: 30px;
   text-align: center;
+  width: 100%;
+  max-width: 500px;
 }
 
 input#scanInput {
   padding: 12px 20px;
   font-size: 18px;
   width: 100%;
-  max-width: 450px;
   text-align: center;
   border: none;
   border-radius: 10px;
@@ -425,13 +427,15 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
 .card {
   width:100%;
-  max-width: 1200px; /* Increased for desktop */
   background:#ffffff;
   border-radius: 24px;
   overflow:hidden;
   box-shadow:0 20px 50px rgba(0,0,0,0.3);
   animation: fadeIn 0.8s ease;
   transition: transform 0.3s ease;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .card:hover {
@@ -449,10 +453,11 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   color:#fff;
   text-align:center;
   padding: 30px;
+  flex-shrink: 0;
 }
 
 .card-header h2 {
-  font-size: 28px; /* Increased for desktop */
+  font-size: 28px;
   font-weight:600;
   margin-bottom: 10px;
 }
@@ -471,6 +476,8 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 /* BODY */
 .card-body {
   padding:30px;
+  overflow-y: auto;
+  flex-grow: 1;
 }
 
 .info-container {
@@ -513,6 +520,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   font-size:14px;
   color:#777;
   border-top: 1px solid #eee;
+  flex-shrink: 0;
 }
 
 /* STATUS */
@@ -545,12 +553,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   }
   
   input#scanInput {
-    max-width: 500px;
     font-size: 20px;
-  }
-  
-  .card {
-    max-width: 1200px;
   }
   
   .card-header {
@@ -693,8 +696,8 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
     // This runs every 100ms to ensure focus is ALWAYS on the input
     setInterval(() => {
       if (document.activeElement !== input) {
-        input.focus();
-      }
+      input.focus();
+    }
     }, 100);
 
     // Listen for Enter key (Scan Complete)
