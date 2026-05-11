@@ -93,7 +93,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==============================
-// 📡 API: LOG BARCODE SCANS
+// 📡 API: LOG BARCODE SCANS (MACHINE ENTRY)
 // ==============================
 app.post("/api/scan", async (req, res) => {
   try {
@@ -103,9 +103,9 @@ app.post("/api/scan", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid barcode ID" });
     }
 
-    // Get user data to verify and extract course type
+    // 1. CHECK: Does this ID exist in the users table?
     const userResult = await pool.query(
-      "SELECT course_type FROM users WHERE id = $1",
+      "SELECT * FROM users WHERE id = $1",
       [barcode_id]
     );
 
@@ -113,19 +113,23 @@ app.post("/api/scan", async (req, res) => {
       return res.json({ success: false, message: "User not found" });
     }
 
-    const course_type = userResult.rows[0].course_type;
-    
-    // Log the scan
+    const user = userResult.rows[0];
+
+    // 2. STORE: Insert into scans table ONLY when scanned here
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info) 
        VALUES ($1, $2, $3)`,
-      [barcode_id, course_type, req.headers['user-agent']]
+      [
+        barcode_id, 
+        user.course_type, 
+        req.headers['user-agent'] // Logs the device used to verify
+      ]
     );
 
-    // Return user data for verification
+    // 3. RETURN: Send back user data so the screen shows the correct name
     res.json({ 
       success: true, 
-      data: userResult.rows[0],
+      data: user,
       message: "Scan logged successfully"
     });
 
@@ -196,7 +200,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER
+// 👤 CREATE USER (GENERATION ONLY - NO SCAN LOG)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -206,11 +210,12 @@ app.post("/create", async (req, res) => {
       softwareUsed, previousCourse, level,
       amount, paymentMode,
       selfieImage, paymentImage,
-      courseType   // ✅ MUST BE HERE
+      courseType
     } = req.body;
 
     const id = generateShortId(); 
 
+    // 1. Insert User into 'users' table
     await pool.query(
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
@@ -227,9 +232,12 @@ app.post("/create", async (req, res) => {
         softwareUsed, previousCourse, level,
         amount, paymentMode,
         selfieImage, paymentImage,
-        courseType   // ✅ NEW FIELD
+        courseType
       ]
     );
+
+    // ❌ NO INSERT INTO 'SCANS' HERE.
+    // We only log to 'scans' when the physical machine scans it.
 
     const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
