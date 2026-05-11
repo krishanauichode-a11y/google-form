@@ -93,6 +93,49 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==============================
+// 📡 API: LOG BARCODE SCANS
+// ==============================
+app.post("/api/scan", async (req, res) => {
+  try {
+    const { barcode_id } = req.body;
+    
+    if (!barcode_id || barcode_id.length !== 7) {
+      return res.status(400).json({ success: false, message: "Invalid barcode ID" });
+    }
+
+    // Get user data to verify and extract course type
+    const userResult = await pool.query(
+      "SELECT course_type FROM users WHERE id = $1",
+      [barcode_id]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    const course_type = userResult.rows[0].course_type;
+    
+    // Log the scan
+    await pool.query(
+      `INSERT INTO scans (barcode_id, course_type, device_info) 
+       VALUES ($1, $2, $3)`,
+      [barcode_id, course_type, req.headers['user-agent']]
+    );
+
+    // Return user data for verification
+    res.json({ 
+      success: true, 
+      data: userResult.rows[0],
+      message: "Scan logged successfully"
+    });
+
+  } catch (err) {
+    console.error("❌ SCAN LOG ERROR:", err);
+    res.status(500).json({ success: false, message: "Scan logging failed" });
+  }
+});
+
+// ==============================
 // 🎟️ GENERATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
@@ -104,8 +147,8 @@ async function generateFinalImage(id) {
       throw new Error("QR or Barcode file missing");
     }
 
- const qr = await loadImage(qrPath);
-const barcode = await loadImage(barPath);
+    const qr = await loadImage(qrPath);
+    const barcode = await loadImage(barPath);
 
     // HD SCALE
     const scale = 2;
@@ -157,36 +200,36 @@ const barcode = await loadImage(barPath);
 // ==============================
 app.post("/create", async (req, res) => {
   try {
-const {
-  fullName, address, email, phone, dob, date,
-  tradingMarket, tradingType, source,
-  softwareUsed, previousCourse, level,
-  amount, paymentMode,
-  selfieImage, paymentImage,
-  courseType   // ✅ MUST BE HERE
-} = req.body;
+    const {
+      fullName, address, email, phone, dob, date,
+      tradingMarket, tradingType, source,
+      softwareUsed, previousCourse, level,
+      amount, paymentMode,
+      selfieImage, paymentImage,
+      courseType   // ✅ MUST BE HERE
+    } = req.body;
 
     const id = generateShortId(); 
 
-await pool.query(
-  `INSERT INTO users(
-    id, full_name, address, email, phone, dob, date,
-    trading_market, trading_type, source,
-    software_used, previous_course, level,
-    amount, payment_mode,
-    selfie_image, payment_image,
-    course_type
-  )
-  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-  [
-    id, fullName, address, email, phone, dob, date,
-    tradingMarket, tradingType, source,
-    softwareUsed, previousCourse, level,
-    amount, paymentMode,
-    selfieImage, paymentImage,
-    courseType   // ✅ NEW FIELD
-  ]
-);
+    await pool.query(
+      `INSERT INTO users(
+        id, full_name, address, email, phone, dob, date,
+        trading_market, trading_type, source,
+        software_used, previous_course, level,
+        amount, payment_mode,
+        selfie_image, payment_image,
+        course_type
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+      [
+        id, fullName, address, email, phone, dob, date,
+        tradingMarket, tradingType, source,
+        softwareUsed, previousCourse, level,
+        amount, paymentMode,
+        selfieImage, paymentImage,
+        courseType   // ✅ NEW FIELD
+      ]
+    );
 
     const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
@@ -271,7 +314,6 @@ async function sendEmail(to, name, imageUrl) {
     `
   });
 }
-
 
 // ==============================
 // 📲 SHARE INTERAKT
@@ -681,30 +723,30 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         </div>
 
         <div class="info-item">
-  <div class="info-label">Course Type</div>
-  <div class="info-value" id="u-course">${u.course_type}</div>
-</div>
+          <div class="info-label">Course Type</div>
+          <div class="info-value" id="u-course">${u.course_type}</div>
+        </div>
       </div>
 
       <div style="margin-top:25px;">
-  <h3 style="margin-bottom:10px;">Verification</h3>
+        <h3 style="margin-bottom:10px;">Verification</h3>
 
-  <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
-    
-    <div style="text-align:center;">
-      <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
-      <img id="u-selfie" src="${u.selfie_image}" 
-           style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
-    </div>
+        <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
+          
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
+            <img id="u-selfie" src="${u.selfie_image}" 
+                 style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
+          </div>
 
-    <div style="text-align:center;">
-      <div style="font-size:14px; margin-bottom:5px;">Payment</div>
-      <img id="u-payment" src="${u.payment_image}" 
-           style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
-    </div>
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Payment</div>
+            <img id="u-payment" src="${u.payment_image}" 
+                 style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
+          </div>
 
-  </div>
-</div>
+        </div>
+      </div>
 
       <div class="status">✔ Valid Entry Approved</div>
       <div id="error-display" class="error-msg">❌ Invalid ID</div>
@@ -750,7 +792,12 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
     async function loadUserData(id) {
       try {
-        const res = await fetch('/api/user/' + id);
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ barcode_id: id })
+        });
+        
         const json = await res.json();
 
         if (json.success) {
@@ -773,11 +820,17 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           document.getElementById('u-payment').src = u.payment_image;
           document.getElementById('u-course').innerText = u.course_type;
 
+          // Update status message
+          document.querySelector('.status').innerText = "✅ Scan logged - Valid Entry Approved";
+          
         } else {
           error.style.display = 'block';
+          document.querySelector('.status').innerText = "❌ Invalid Barcode";
         }
       } catch (err) {
         console.error(err);
+        error.style.display = 'block';
+        document.querySelector('.status').innerText = "❌ Scan Error";
       }
     }
   </script>
@@ -799,3 +852,26 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
 });
+
+// Initialize database tables
+async function initializeDatabase() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS scans (
+        id SERIAL PRIMARY KEY,
+        barcode_id VARCHAR(7) NOT NULL,
+        course_type VARCHAR(255) NOT NULL,
+        scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        device_info TEXT
+      );
+    `);
+    console.log("✅ Scans table initialized");
+  } catch (err) {
+    console.error("❌ Table initialization error:", err);
+  } finally {
+    client.release();
+  }
+}
+
+initializeDatabase().catch(console.error);
