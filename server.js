@@ -100,38 +100,104 @@ app.post("/api/scan", async (req, res) => {
     const { barcode_id } = req.body;
     
     if (!barcode_id || barcode_id.length !== 7) {
-      return res.status(400).json({ success: false, message: "Invalid barcode ID" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid barcode ID" 
+      });
     }
 
-    // Get user data to verify and extract course type
+    // Get complete user data
     const userResult = await pool.query(
-      "SELECT course_type FROM users WHERE id = $1",
+      "SELECT * FROM users WHERE id = $1",
       [barcode_id]
     );
 
     if (userResult.rows.length === 0) {
-      return res.json({ success: false, message: "User not found" });
+      return res.json({ 
+        success: false, 
+        message: "User not found" 
+      });
     }
 
-    const course_type = userResult.rows[0].course_type;
+    const user = userResult.rows[0];
     
-    // Log the scan
-    await pool.query(
-      `INSERT INTO scans (barcode_id, course_type, device_info) 
-       VALUES ($1, $2, $3)`,
-      [barcode_id, course_type, req.headers['user-agent']]
+    // Log the scan with user reference
+    const scanResult = await pool.query(
+      `INSERT INTO scans (barcode_id, course_type, user_id, device_info) 
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [barcode_id, user.course_type, user.id, req.headers['user-agent'] || 'Unknown']
     );
 
-    // Return user data for verification
+    // Return complete user data for verification
     res.json({ 
       success: true, 
-      data: userResult.rows[0],
-      message: "Scan logged successfully"
+      scan_id: scanResult.rows[0].id,
+      data: user,
+      message: "Scan logged successfully",
+      scanned_at: new Date().toISOString()
     });
 
   } catch (err) {
     console.error("❌ SCAN LOG ERROR:", err);
-    res.status(500).json({ success: false, message: "Scan logging failed" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Scan logging failed",
+      error: err.message 
+    });
+  }
+});
+
+// ==============================
+// 📡 API: GET SCAN HISTORY
+// ==============================
+app.get("/api/scans/:user_id", async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    
+    // Validate user exists
+    const userCheck = await pool.query(
+      "SELECT id FROM users WHERE id = $1",
+      [user_id]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    // Get scan history
+    const scansResult = await pool.query(
+      `SELECT 
+        id, 
+        barcode_id, 
+        course_type, 
+        scanned_at, 
+        device_info, 
+        is_valid
+      FROM scans 
+      WHERE user_id = $1 
+      ORDER BY scanned_at DESC 
+      LIMIT 50`,
+      [user_id]
+    );
+
+    res.json({ 
+      success: true, 
+      user_id,
+      scans: scansResult.rows,
+      total_scans: scansResult.rows.length
+    });
+
+  } catch (err) {
+    console.error("❌ SCAN HISTORY ERROR:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to get scan history",
+      error: err.message 
+    });
   }
 });
 
@@ -583,6 +649,41 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   background-color: rgba(255,68,68,0.1);
 }
 
+/* SCAN HISTORY */
+.scan-history {
+  margin-top: 25px;
+  padding: 15px;
+  background-color: rgba(0,200,83,0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(0,200,83,0.2);
+}
+
+.scan-history h3 {
+  margin-bottom: 10px;
+  color: #009624;
+}
+
+.scan-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+.scan-item:last-child {
+  border-bottom: none;
+}
+
+.scan-time {
+  font-size: 14px;
+  color: #666;
+}
+
+.scan-device {
+  font-size: 14px;
+  color: #888;
+}
+
 /* DESKTOP OPTIMIZATION */
 @media(min-width:768px){
   .scanner-box {
@@ -751,6 +852,14 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
       <div class="status">✔ Valid Entry Approved</div>
       <div id="error-display" class="error-msg">❌ Invalid ID</div>
 
+      <!-- Scan History Section -->
+      <div class="scan-history">
+        <h3>Scan History</h3>
+        <div id="scan-history-container">
+          <p style="color: #888; text-align: center;">No scans yet</p>
+        </div>
+      </div>
+
     </div>
 
     <div class="card-footer">
@@ -762,6 +871,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   <script>
     const input = document.getElementById('scanInput');
     const error = document.getElementById('error-display');
+    const historyContainer = document.getElementById('scan-history-container');
 
     // ✅ CRITICAL FIX: Force Focus Loop
     // This runs every 100ms to ensure focus is ALWAYS on the input
@@ -786,6 +896,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           
           // Fetch new data
           await loadUserData(id);
+          await loadScanHistory(id);
         }
       }
     });
@@ -833,6 +944,42 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         document.querySelector('.status').innerText = "❌ Scan Error";
       }
     }
+
+    async function loadScanHistory(userId) {
+      try {
+        const res = await fetch(`/api/scans/${userId}`);
+        const json = await res.json();
+
+        if (json.success && json.scans.length > 0) {
+          historyContainer.innerHTML = json.scans.map(scan => `
+            <div class="scan-item">
+              <div>
+                <div class="scan-time">${new Date(scan.scanned_at).toLocaleString()}</div>
+                <div class="scan-device">${scan.device_info || 'Unknown Device'}</div>
+              </div>
+              <div>
+                <span style="color: ${scan.is_valid ? '#00c853' : '#ff4444'};">
+                  ${scan.is_valid ? '✓ Valid' : '✗ Invalid'}
+                </span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          historyContainer.innerHTML = '<p style="color: #888; text-align: center;">No scans yet</p>';
+        }
+      } catch (err) {
+        console.error('Failed to load scan history:', err);
+        historyContainer.innerHTML = '<p style="color: #ff4444;">Error loading scan history</p>';
+      }
+    }
+
+    // Load scan history on page load
+    window.addEventListener('load', () => {
+      const currentId = window.location.pathname.split('/').pop();
+      if (currentId && currentId !== 'user') {
+        loadScanHistory(currentId);
+      }
+    });
   </script>
 
 </body>
@@ -857,16 +1004,31 @@ app.listen(PORT, () => {
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
+    // Create scans table with foreign key constraint
     await client.query(`
-      CREATE TABLE IF NOT EXISTS scans (
+      CREATE TABLE IF NOT EXISTS public.scans (
         id SERIAL PRIMARY KEY,
-        barcode_id VARCHAR(7) NOT NULL,
-        course_type VARCHAR(255) NOT NULL,
+        barcode_id TEXT NOT NULL,
+        course_type TEXT NOT NULL,
+        user_id TEXT NOT NULL,
         scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        device_info TEXT
+        device_info TEXT,
+        is_valid BOOLEAN DEFAULT true,
+        CONSTRAINT fk_user
+          FOREIGN KEY(user_id) 
+          REFERENCES public.users(id)
+          ON DELETE CASCADE
       );
     `);
-    console.log("✅ Scans table initialized");
+
+    // Create indexes for better performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_scans_barcode_id ON public.scans(barcode_id);
+      CREATE INDEX IF NOT EXISTS idx_scans_scanned_at ON public.scans(scanned_at);
+      CREATE INDEX IF NOT EXISTS idx_scans_user_id ON public.scans(user_id);
+    `);
+
+    console.log("✅ Scans table initialized with foreign key constraints");
   } catch (err) {
     console.error("❌ Table initialization error:", err);
   } finally {
