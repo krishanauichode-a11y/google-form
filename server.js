@@ -947,19 +947,19 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
     async function loadScanHistory(userId) {
       try {
-        const res = await fetch(`/api/scans/${userId}`);
+        const res = await fetch(\`/api/scans/\${userId}\`);
         const json = await res.json();
 
         if (json.success && json.scans.length > 0) {
           historyContainer.innerHTML = json.scans.map(scan => `
             <div class="scan-item">
               <div>
-                <div class="scan-time">${new Date(scan.scanned_at).toLocaleString()}</div>
-                <div class="scan-device">${scan.device_info || 'Unknown Device'}</div>
+                <div class="scan-time">\${new Date(scan.scanned_at).toLocaleString()}</div>
+                <div class="scan-device">\${scan.device_info || 'Unknown Device'}</div>
               </div>
               <div>
-                <span style="color: ${scan.is_valid ? '#00c853' : '#ff4444'};">
-                  ${scan.is_valid ? '✓ Valid' : '✗ Invalid'}
+                <span style="color: \${scan.is_valid ? '#00c853' : '#ff4444'};">
+                  \${scan.is_valid ? '✓ Valid' : '✗ Invalid'}
                 </span>
               </div>
             </div>
@@ -1005,7 +1005,7 @@ async function initializeDatabase() {
   const client = await pool.connect();
   try {
     // Create scans table with foreign key constraint
-    await client.query(`
+    await client.query(\`
       CREATE TABLE IF NOT EXISTS public.scans (
         id SERIAL PRIMARY KEY,
         barcode_id TEXT NOT NULL,
@@ -1019,14 +1019,14 @@ async function initializeDatabase() {
           REFERENCES public.users(id)
           ON DELETE CASCADE
       );
-    `);
+    \`);
 
     // Create indexes for better performance
-    await client.query(`
+    await client.query(\`
       CREATE INDEX IF NOT EXISTS idx_scans_barcode_id ON public.scans(barcode_id);
       CREATE INDEX IF NOT EXISTS idx_scans_scanned_at ON public.scans(scanned_at);
       CREATE INDEX IF NOT EXISTS idx_scans_user_id ON public.scans(user_id);
-    `);
+    \`);
 
     console.log("✅ Scans table initialized with foreign key constraints");
   } catch (err) {
