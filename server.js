@@ -137,14 +137,14 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (BIG LOGO, NO NUMBER)
+// 🎟️ GENERATE FINAL IMAGE (FULL WIDTH LOGO)
 // ==============================
 async function generateFinalImage(id) {
   try {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
     
-    // LOGO PATH
+    // LOGO PATH: Points to ROOT folder
     const logoPath = path.join(__dirname, 'logo.png'); 
 
     if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
@@ -180,50 +180,70 @@ async function generateFinalImage(id) {
     ctx.strokeStyle = primaryColor;
     ctx.strokeRect(10, 10, 680, 880);
 
+    // Center Alignment Helper
     const centerX = 350;
 
-    // --- 3. Header Section (BIG LOGO + WEBSITE ONLY) ---
-    
-    // Draw Logo (Big)
-    const logoSize = 230;
-    const logoX = centerX - (logoSize / 2);
+    // Initialize Vertical Position Tracker (Starts at top)
+    let currentY = 40; 
+
+    // --- 3. Header Section (LOGO 100% WIDTH) ---
     if (logo) {
-        ctx.drawImage(logo, logoX, 30, logoSize, logoSize); // Ends at y=260
+        // Set width to ~660px (Full width minus padding)
+        const maxLogoWidth = 660; 
+        const ratio = logo.width / logo.height;
+        
+        const logoWidth = maxLogoWidth;
+        // Calculate height based on width to maintain aspect ratio
+        const logoHeight = logoWidth / ratio;
+        
+        // Center the logo horizontally
+        const logoX = (700 - logoWidth) / 2;
+
+        ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
+        
+        // Move the "cursor" down below the logo + add 20px padding
+        currentY += logoHeight + 20; 
     }
 
-    // Website
+    // --- Website (Centered below logo) ---
     ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 18px Arial";
-    ctx.fillText("www.tusharbhumkar.com", centerX, 280);
+    ctx.font = "bold 20px Arial";
+    ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
 
-    // Divider Line (Moved up to remove gap)
+    // --- Divider Line ---
+    currentY += 30; // Add space below text
     ctx.beginPath();
-    ctx.moveTo(150, 295); 
-    ctx.lineTo(550, 295);
+    ctx.moveTo(50, currentY);
+    ctx.lineTo(650, currentY);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = primaryColor;
+    ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
 
     // --- 4. Main Title (ENTRY PASS) ---
-    // Moved up to sit closer to the line
-    ctx.textAlign = "center";
+    currentY += 50; // Add space below line
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 45px Arial"; 
-    ctx.fillText("ENTRY PASS", centerX, 330);
+    ctx.font = "bold 50px Arial"; 
+    ctx.fillText("ENTRY PASS", centerX, currentY);
 
     // --- 5. QR Code ---
-    const qrSize = 280; 
+    const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
-    ctx.drawImage(qrImage, qrX, 345, qrSize, qrSize); // Moved up to y=345
+    
+    currentY += 30; // Space between title and QR
+    ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
 
     // --- 6. Barcode ---
-    ctx.drawImage(barcodeImg, 100, 670, 500, 90);
+    // Move down below QR code + add space
+    currentY += qrSize + 40; 
+    ctx.drawImage(barcodeImg, 50, currentY, 600, 100);
 
     // --- 7. Instructions ---
+    // Move down below barcode
+    currentY += 120; 
     ctx.fillStyle = "#000";
-    ctx.font = "italic 18px Arial";
-    ctx.fillText("Scan QR or Barcode at Entry", centerX, 800);
+    ctx.font = "italic 20px Arial";
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, currentY);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
@@ -240,7 +260,6 @@ async function generateFinalImage(id) {
     throw err;
   }
 }
-
 // ==============================
 // 👤 CREATE USER
 // ==============================
