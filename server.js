@@ -186,8 +186,8 @@ async function generateFinalImage(id) {
     // --- 3. LOGO (BIGGER SIZE - Aspect Ratio Fixed) ---
     if (logo) {
         // INCREASED SIZE: 300px wide, 200px high max
-        const maxLogoWidth = 300; 
-        const maxLogoHeight = 200;
+        const maxLogoWidth = 500; 
+        const maxLogoHeight = 300;
 
         // Calculate scale to fit inside the box without stretching
         const scaleFactor = Math.min(maxLogoWidth / logo.width, maxLogoHeight / logo.height);
