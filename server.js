@@ -137,7 +137,7 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (CENTERED LAYOUT)
+// 🎟️ GENERATE FINAL IMAGE (FIXED LAYOUT - ORIGINAL TEXT)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -180,52 +180,65 @@ async function generateFinalImage(id) {
     ctx.strokeStyle = primaryColor;
     ctx.strokeRect(10, 10, 680, 880);
 
-    // Center Alignment Helper
     const centerX = 350;
+    let currentY = 40; // Vertical tracker
 
-    // --- 3. Header Section (LOGO CENTERED) ---
-    
-    // Draw Logo (Centered at top)
+    // --- 3. LOGO (Aspect Ratio Fixed) ---
     if (logo) {
-        // Center X calculation: 350 - (160 width / 2) = 270
-        ctx.drawImage(logo, 270, 40, 180, 180); 
+        // Define maximum allowed space for the logo
+        const maxLogoWidth = 240; 
+        const maxLogoHeight = 160;
+
+        // Calculate scale to fit inside the box without stretching
+        const scaleFactor = Math.min(maxLogoWidth / logo.width, maxLogoHeight / logo.height);
+        
+        const drawWidth = logo.width * scaleFactor;
+        const drawHeight = logo.height * scaleFactor;
+        
+        // Center X calculation
+        const logoX = centerX - (drawWidth / 2);
+
+        ctx.drawImage(logo, logoX, currentY, drawWidth, drawHeight);
+        
+        // Move Y down below the logo + 15px padding
+        currentY += drawHeight + 15; 
     }
 
-    // Website (Centered below logo)
+    // --- 4. Website Text ---
     ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 20px Arial";
-    ctx.fillText("www.tusharbhumkar.com", centerX, 220);
+    ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
+    currentY += 25; // Move down
 
-    // Divider Line
+    // --- 5. Divider Line ---
     ctx.beginPath();
-    ctx.moveTo(50, 240); // Line moved down
-    ctx.lineTo(650, 240);
+    ctx.moveTo(50, currentY);
+    ctx.lineTo(650, currentY);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
+    currentY += 40; // Move down
 
-    // --- 4. Main Title (ENTRY PASS) ---
+    // --- 6. Main Title (ENTRY PASS) ---
     ctx.textAlign = "center";
-    
-    // Draw the Border Box
-    // ctx.lineWidth = 2;
-    // ctx.strokeStyle = primaryColor;
-    // ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
-
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 50px Arial"; 
-    ctx.fillText("ENTRY PASS", centerX, 290);
+    ctx.fillText("ENTRY PASS", centerX, currentY);
+    currentY += 40; // Move down
 
-    // --- 5. QR Code ---
+    // --- 7. QR Code ---
     const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
-    ctx.drawImage(qrImage, qrX, 320, qrSize, qrSize);
+    ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
+    
+    // QR Code bottom position calculation
+    currentY += qrSize + 30; 
 
-    // --- 6. Barcode ---
+    // --- 8. Barcode (Fixed at bottom) ---
     ctx.drawImage(barcodeImg, 50, 680, 600, 100);
 
-    // --- 7. Instructions ---
+    // --- 9. Instructions ---
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
     ctx.fillText("Scan QR or Barcode at Entry", centerX, 830);
@@ -245,7 +258,6 @@ async function generateFinalImage(id) {
     throw err;
   }
 }
-
 // ==============================
 // 👤 CREATE USER
 // ==============================
