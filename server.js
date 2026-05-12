@@ -156,7 +156,7 @@ async function generateFinalImage(id) {
     }
 
     const qr = await loadImage(qrPath);
-    const barcode = await loadImage(barcode);
+    const barcode = await loadImage(barPath);
     
     // Load Logo (Check if it exists to prevent crash if missing)
     let logo;
