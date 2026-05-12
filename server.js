@@ -137,7 +137,7 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (BIG LOGO + TALLER CARD)
+// 🎟️ GENERATE FINAL IMAGE (CENTERED LAYOUT)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -163,7 +163,7 @@ async function generateFinalImage(id) {
 
     // HD SCALE
     const scale = 2;
-    const canvas = createCanvas(700 * scale, 950 * scale); // INCREASED HEIGHT to 950
+    const canvas = createCanvas(700 * scale, 900 * scale);
     const ctx = canvas.getContext("2d");
 
     ctx.scale(scale, scale);
@@ -172,35 +172,35 @@ async function generateFinalImage(id) {
 
     // --- 1. Background ---
     ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, 700, 950);
+    ctx.fillRect(0, 0, 700, 900);
 
     // --- 2. PROFESSIONAL BORDER (Navy Blue) ---
     const primaryColor = "#003366"; // Navy Blue
     ctx.lineWidth = 20; 
     ctx.strokeStyle = primaryColor;
-    ctx.strokeRect(10, 10, 680, 930); // Adjusted Border Height
+    ctx.strokeRect(10, 10, 680, 880);
 
     // Center Alignment Helper
     const centerX = 350;
 
-    // --- 3. Header Section (BIG LOGO) ---
+    // --- 3. Header Section (LOGO CENTERED) ---
     
-    // Draw Logo (BIG SIZE: 250x250)
+    // Draw Logo (Centered at top)
     if (logo) {
-        // Center X: 350 - (250/2) = 225
-        ctx.drawImage(logo, 225, 40, 250, 250); 
+        // Center X calculation: 350 - (160 width / 2) = 270
+        ctx.drawImage(logo, 270, 40, 180, 180); 
     }
 
-    // Website (Below Logo)
+    // Website (Centered below logo)
     ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 18px Arial"; // Slightly larger font
-    ctx.fillText("www.tusharbhumkar.com", centerX, 315);
+    ctx.font = "bold 20px Arial";
+    ctx.fillText("www.tusharbhumkar.com", centerX, 220);
 
     // Divider Line
     ctx.beginPath();
-    ctx.moveTo(50, 340); // Line moved down
-    ctx.lineTo(650, 340);
+    ctx.moveTo(50, 240); // Line moved down
+    ctx.lineTo(650, 240);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
@@ -208,27 +208,27 @@ async function generateFinalImage(id) {
     // --- 4. Main Title (ENTRY PASS) ---
     ctx.textAlign = "center";
     
-    // Draw the Border Box (Moved down)
+    // Draw the Border Box
     // ctx.lineWidth = 2;
     // ctx.strokeStyle = primaryColor;
-    // ctx.strokeRect(centerX - 160, 390 - 50, 320, 60);
+    // ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
 
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 30px Arial"; 
-    ctx.fillText("ENTRY PASS", centerX, 390);
+    ctx.font = "bold 50px Arial"; 
+    ctx.fillText("ENTRY PASS", centerX, 290);
 
-    // --- 5. QR Code (Moved down) ---
+    // --- 5. QR Code ---
     const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
-    ctx.drawImage(qrImage, qrX, 440, qrSize, qrSize);
+    ctx.drawImage(qrImage, qrX, 320, qrSize, qrSize);
 
-    // --- 6. Barcode (Moved down) ---
-    ctx.drawImage(barcodeImg, 50, 790, 600, 100);
+    // --- 6. Barcode ---
+    ctx.drawImage(barcodeImg, 50, 680, 600, 100);
 
-    // --- 7. Instructions (Moved down) ---
+    // --- 7. Instructions ---
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
-    ctx.fillText("Scan QR or Barcode at Entry", centerX, 920);
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, 830);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
