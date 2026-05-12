@@ -153,7 +153,7 @@ async function generateFinalImage(id) {
 
     // Load images
     const qrImage = await loadImage(qrPath);
-    const barcodeImg = await loadImage(barcodeImg); // Note: Load image logic slightly adjusted below for safety
+    const barcodeImg = await loadImage(barPath); // Note: Load image logic slightly adjusted below for safety
     
     let logo;
     if (fs.existsSync(logoPath)) {
