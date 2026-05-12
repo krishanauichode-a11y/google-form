@@ -137,7 +137,7 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (INCREASED HEIGHT & REFINED LAYOUT)
+// 🎟️ GENERATE FINAL IMAGE (LOGO 70% WIDTH)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -153,7 +153,7 @@ async function generateFinalImage(id) {
 
     // Load images
     const qrImage = await loadImage(qrPath);
-    const barcodeImg = await loadImage(barPath); // Note: Load image logic slightly adjusted below for safety
+    const barcodeImg = await loadImage(barPath);
     
     let logo;
     if (fs.existsSync(logoPath)) {
@@ -161,10 +161,9 @@ async function generateFinalImage(id) {
     }
 
     // 1. SETUP CANVAS
-    // Increased Height to 1200px to prevent crowding
     const scale = 2;
     const canvasWidth = 700;
-    const canvasHeight = 1200; 
+    const canvasHeight = 1050; // Maintained height for good fit
     const canvas = createCanvas(canvasWidth * scale, canvasHeight * scale);
     const ctx = canvas.getContext("2d");
 
@@ -177,47 +176,49 @@ async function generateFinalImage(id) {
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     const primaryColor = "#003366"; // Navy Blue
-    const borderColor = "#003366";
     
-    // Draw Border
-    ctx.lineWidth = 20; 
-    ctx.strokeStyle = borderColor;
+    // Border
+    const borderW = 15;
+    ctx.lineWidth = borderW; 
+    ctx.strokeStyle = primaryColor;
     ctx.strokeRect(10, 10, canvasWidth - 20, canvasHeight - 20);
 
     const centerX = 350;
-    let currentY = 40; // Vertical cursor position
+    let currentY = 30; // Start close to top
 
-    // 3. LOGO (Top, Large, Centered)
+    // 3. LOGO (70% WIDTH)
     if (logo) {
-        const maxLogoWidth = 660; // Full width minus padding
+        // Calculation: 700px * 0.70 = 490px
+        const maxLogoWidth = 490; 
+        
         const ratio = logo.width / logo.height;
         const logoWidth = maxLogoWidth;
         const logoHeight = logoWidth / ratio;
         const logoX = (canvasWidth - logoWidth) / 2;
 
         ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
-        currentY += logoHeight + 30; // Move down after logo
+        currentY += logoHeight + 15; // Slightly more gap since logo is smaller
     }
 
-    // 4. GREY INFO BAR (From Reference Image)
-    // const barHeight = 40;
-    // ctx.fillStyle = "#f4f4f4"; // Light Grey
+    // // 4. GREY INFO BAR
+    // const barHeight = 35;
+    // ctx.fillStyle = "#f4f4f4"; 
     // ctx.fillRect(20, currentY, 660, barHeight);
     
     // ctx.fillStyle = "#333";
     // ctx.textAlign = "center";
-    // ctx.font = "bold 16px Arial";
-    // ctx.fillText("For More Information Call Us On 92 72 000 111", centerX, currentY + 25);
+    // ctx.font = "bold 14px Arial";
+    // ctx.fillText("For More Information Call Us On 92 72 000 111", centerX, currentY + 22);
     
-    // currentY += barHeight + 30; // Move down after info bar
+    // currentY += barHeight + 15;
 
     // 5. WEBSITE URL
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 20px Arial";
+    ctx.font = "bold 18px Arial";
     ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
 
     // 6. DIVIDER LINE
-    currentY += 30;
+    currentY += 25;
     ctx.beginPath();
     ctx.moveTo(50, currentY);
     ctx.lineTo(650, currentY);
@@ -226,32 +227,26 @@ async function generateFinalImage(id) {
     ctx.stroke();
 
     // 7. MAIN TITLE
-    currentY += 60; // More space for title
+    currentY += 40;
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 50px Arial"; 
+    ctx.font = "bold 45px Arial";
     ctx.fillText("ENTRY PASS", centerX, currentY);
 
     // 8. QR CODE
-    const qrSize = 320; 
+    const qrSize = 300;
     const qrX = centerX - (qrSize / 2);
-    currentY += 40; // Space between Title and QR
+    currentY += 30; 
     ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
 
     // 9. BARCODE
-    currentY += qrSize + 50; // Space between QR and Barcode
-    ctx.drawImage(barcodeImg, 50, currentY, 600, 100);
+    currentY += qrSize + 40; 
+    ctx.drawImage(barcodeImg, 50, currentY, 600, 90);
 
-    // 10. INSTRUCTIONS
-    currentY += 130; // Space below Barcode
+    // 10. FOOTER INSTRUCTIONS (Anchored to bottom)
     ctx.fillStyle = "#000";
-    ctx.font = "italic 20px Arial";
-    ctx.fillText("Scan QR or Barcode at Entry", centerX, currentY);
-
-    // 11. WEBSITE FOOTER (Repeated at bottom like reference)
-    // currentY += 50;
-    // ctx.fillStyle = "#888";
-    // ctx.font = "14px Arial";
-    // ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
+    ctx.font = "italic 18px Arial";
+    const footerY = canvasHeight - 60; 
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, footerY);
 
     // Save
     const finalPath = path.join(tempDir, `${id}-final.png`);
