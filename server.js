@@ -223,7 +223,7 @@ async function generateFinalImage(id) {
     ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
 
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 50px Arial"; 
+    ctx.font = "bold 30px Arial"; 
     ctx.fillText("ENTRY PASS", centerX, 290);
 
     // --- 5. QR Code ---
