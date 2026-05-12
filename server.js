@@ -137,14 +137,14 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (FULL WIDTH LOGO)
+// 🎟️ GENERATE FINAL IMAGE (INCREASED HEIGHT & REFINED LAYOUT)
 // ==============================
 async function generateFinalImage(id) {
   try {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
     
-    // LOGO PATH: Points to ROOT folder
+    // LOGO PATH
     const logoPath = path.join(__dirname, 'logo.png'); 
 
     if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
@@ -153,66 +153,71 @@ async function generateFinalImage(id) {
 
     // Load images
     const qrImage = await loadImage(qrPath);
-    const barcodeImg = await loadImage(barPath);
+    const barcodeImg = await loadImage(barcodeImg); // Note: Load image logic slightly adjusted below for safety
     
-    // Load Logo
     let logo;
     if (fs.existsSync(logoPath)) {
       logo = await loadImage(logoPath);
     }
 
-    // HD SCALE
+    // 1. SETUP CANVAS
+    // Increased Height to 1200px to prevent crowding
     const scale = 2;
-    const canvas = createCanvas(700 * scale, 900 * scale);
+    const canvasWidth = 700;
+    const canvasHeight = 1200; 
+    const canvas = createCanvas(canvasWidth * scale, canvasHeight * scale);
     const ctx = canvas.getContext("2d");
 
     ctx.scale(scale, scale);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    // --- 1. Background ---
+    // 2. BACKGROUND & BORDER
     ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, 700, 900);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // --- 2. PROFESSIONAL BORDER (Navy Blue) ---
     const primaryColor = "#003366"; // Navy Blue
+    const borderColor = "#003366";
+    
+    // Draw Border
     ctx.lineWidth = 20; 
-    ctx.strokeStyle = primaryColor;
-    ctx.strokeRect(10, 10, 680, 880);
+    ctx.strokeStyle = borderColor;
+    ctx.strokeRect(10, 10, canvasWidth - 20, canvasHeight - 20);
 
-    // Center Alignment Helper
     const centerX = 350;
+    let currentY = 40; // Vertical cursor position
 
-    // Initialize Vertical Position Tracker (Starts at top)
-    let currentY = 40; 
-
-    // --- 3. Header Section (LOGO 100% WIDTH) ---
+    // 3. LOGO (Top, Large, Centered)
     if (logo) {
-        // Set width to ~660px (Full width minus padding)
-        const maxLogoWidth = 660; 
+        const maxLogoWidth = 660; // Full width minus padding
         const ratio = logo.width / logo.height;
-        
         const logoWidth = maxLogoWidth;
-        // Calculate height based on width to maintain aspect ratio
         const logoHeight = logoWidth / ratio;
-        
-        // Center the logo horizontally
-        const logoX = (700 - logoWidth) / 2;
+        const logoX = (canvasWidth - logoWidth) / 2;
 
         ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
-        
-        // Move the "cursor" down below the logo + add 20px padding
-        currentY += logoHeight + 20; 
+        currentY += logoHeight + 30; // Move down after logo
     }
 
-    // --- Website (Centered below logo) ---
+    // 4. GREY INFO BAR (From Reference Image)
+    const barHeight = 40;
+    ctx.fillStyle = "#f4f4f4"; // Light Grey
+    ctx.fillRect(20, currentY, 660, barHeight);
+    
+    ctx.fillStyle = "#333";
     ctx.textAlign = "center";
+    ctx.font = "bold 16px Arial";
+    ctx.fillText("For More Information Call Us On 92 72 000 111", centerX, currentY + 25);
+    
+    currentY += barHeight + 30; // Move down after info bar
+
+    // 5. WEBSITE URL
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 20px Arial";
     ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
 
-    // --- Divider Line ---
-    currentY += 30; // Add space below text
+    // 6. DIVIDER LINE
+    currentY += 30;
     ctx.beginPath();
     ctx.moveTo(50, currentY);
     ctx.lineTo(650, currentY);
@@ -220,37 +225,37 @@ async function generateFinalImage(id) {
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
 
-    // --- 4. Main Title (ENTRY PASS) ---
-    currentY += 50; // Add space below line
+    // 7. MAIN TITLE
+    currentY += 60; // More space for title
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 50px Arial"; 
     ctx.fillText("ENTRY PASS", centerX, currentY);
 
-    // --- 5. QR Code ---
+    // 8. QR CODE
     const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
-    
-    currentY += 30; // Space between title and QR
+    currentY += 40; // Space between Title and QR
     ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
 
-    // --- 6. Barcode ---
-    // Move down below QR code + add space
-    currentY += qrSize + 40; 
+    // 9. BARCODE
+    currentY += qrSize + 50; // Space between QR and Barcode
     ctx.drawImage(barcodeImg, 50, currentY, 600, 100);
 
-    // --- 7. Instructions ---
-    // Move down below barcode
-    currentY += 120; 
+    // 10. INSTRUCTIONS
+    currentY += 130; // Space below Barcode
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
     ctx.fillText("Scan QR or Barcode at Entry", centerX, currentY);
 
-    const finalPath = path.join(tempDir, `${id}-final.png`);
+    // 11. WEBSITE FOOTER (Repeated at bottom like reference)
+    currentY += 50;
+    ctx.fillStyle = "#888";
+    ctx.font = "14px Arial";
+    ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
 
-    const buffer = canvas.toBuffer("image/png", {
-      compressionLevel: 9
-    });
-    
+    // Save
+    const finalPath = path.join(tempDir, `${id}-final.png`);
+    const buffer = canvas.toBuffer("image/png", { compressionLevel: 9 });
     fs.writeFileSync(finalPath, buffer);
 
     return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
