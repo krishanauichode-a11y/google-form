@@ -137,7 +137,7 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (CENTERED LAYOUT)
+// 🎟️ GENERATE FINAL IMAGE (BIG LOGO + PHONE NUMBER)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -163,7 +163,8 @@ async function generateFinalImage(id) {
 
     // HD SCALE
     const scale = 2;
-    const canvas = createCanvas(700 * scale, 900 * scale);
+    // Increased Height to 1050 to fit Big Logo and Phone Number perfectly
+    const canvas = createCanvas(700 * scale, 1050 * scale); 
     const ctx = canvas.getContext("2d");
 
     ctx.scale(scale, scale);
@@ -172,35 +173,40 @@ async function generateFinalImage(id) {
 
     // --- 1. Background ---
     ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, 700, 900);
+    ctx.fillRect(0, 0, 700, 1050);
 
     // --- 2. PROFESSIONAL BORDER (Navy Blue) ---
     const primaryColor = "#003366"; // Navy Blue
     ctx.lineWidth = 20; 
     ctx.strokeStyle = primaryColor;
-    ctx.strokeRect(10, 10, 680, 880);
+    ctx.strokeRect(10, 10, 680, 1030); // Adjusted Border Height
 
     // Center Alignment Helper
     const centerX = 350;
 
-    // --- 3. Header Section (LOGO CENTERED) ---
+    // --- 3. Header Section (BIG LOGO) ---
     
-    // Draw Logo (Centered at top)
+    // Draw Logo (HUGE SIZE: 350x350)
     if (logo) {
-        // Center X calculation: 350 - (160 width / 2) = 270
-        ctx.drawImage(logo, 270, 40, 180, 180); 
+        // Center X: 350 - (350/2) = 175
+        ctx.drawImage(logo, 175, 40, 350, 350); 
     }
 
-    // Website (Centered below logo)
+    // Phone Number (Added based on reference image)
     ctx.textAlign = "center";
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 32px Arial"; 
+    ctx.fillText("92 72 000 111", centerX, 420);
+
+    // Website (Below Phone)
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 20px Arial";
-    ctx.fillText("www.tusharbhumkar.com", centerX, 220);
+    ctx.font = "italic 20px Arial";
+    ctx.fillText("www.tusharbhumkar.com", centerX, 450);
 
     // Divider Line
     ctx.beginPath();
-    ctx.moveTo(50, 240); // Line moved down
-    ctx.lineTo(650, 240);
+    ctx.moveTo(50, 470); 
+    ctx.lineTo(650, 470);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
@@ -211,24 +217,24 @@ async function generateFinalImage(id) {
     // Draw the Border Box
     // ctx.lineWidth = 2;
     // ctx.strokeStyle = primaryColor;
-    // ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
+    // ctx.strokeRect(centerX - 160, 520 - 50, 320, 60);
 
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 50px Arial"; 
-    ctx.fillText("ENTRY PASS", centerX, 290);
+    ctx.fillText("ENTRY PASS", centerX, 520);
 
     // --- 5. QR Code ---
     const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
-    ctx.drawImage(qrImage, qrX, 320, qrSize, qrSize);
+    ctx.drawImage(qrImage, qrX, 580, qrSize, qrSize);
 
     // --- 6. Barcode ---
-    ctx.drawImage(barcodeImg, 50, 680, 600, 100);
+    ctx.drawImage(barcodeImg, 50, 930, 600, 100);
 
     // --- 7. Instructions ---
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
-    ctx.fillText("Scan QR or Barcode at Entry", centerX, 830);
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, 1030);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
