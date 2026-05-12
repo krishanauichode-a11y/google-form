@@ -137,7 +137,7 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (FIXED LAYOUT - ORIGINAL TEXT)
+// 🎟️ GENERATE FINAL IMAGE (REDUCED MIDDLE GAP)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -183,11 +183,11 @@ async function generateFinalImage(id) {
     const centerX = 350;
     let currentY = 40; // Vertical tracker
 
-    // --- 3. LOGO (Aspect Ratio Fixed) ---
+    // --- 3. LOGO (BIGGER SIZE - Aspect Ratio Fixed) ---
     if (logo) {
-        // Define maximum allowed space for the logo
-        const maxLogoWidth = 240; 
-        const maxLogoHeight = 160;
+        // INCREASED SIZE: 300px wide, 200px high max
+        const maxLogoWidth = 300; 
+        const maxLogoHeight = 200;
 
         // Calculate scale to fit inside the box without stretching
         const scaleFactor = Math.min(maxLogoWidth / logo.width, maxLogoHeight / logo.height);
@@ -209,7 +209,7 @@ async function generateFinalImage(id) {
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 20px Arial";
     ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
-    currentY += 25; // Move down
+    currentY += 30; 
 
     // --- 5. Divider Line ---
     ctx.beginPath();
@@ -218,30 +218,36 @@ async function generateFinalImage(id) {
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
-    currentY += 40; // Move down
+    
+    // --- GAP: Big gap between Website/Divider and Entry Pass ---
+    currentY += 70; 
 
     // --- 6. Main Title (ENTRY PASS) ---
     ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 50px Arial"; 
     ctx.fillText("ENTRY PASS", centerX, currentY);
-    currentY += 40; // Move down
+    currentY += 50; 
 
     // --- 7. QR Code ---
     const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
     ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
-    
-    // QR Code bottom position calculation
-    currentY += qrSize + 30; 
 
-    // --- 8. Barcode (Fixed at bottom) ---
-    ctx.drawImage(barcodeImg, 50, 680, 600, 100);
+    // --- 8. Barcode (REDUCED GAP - Moved Closer to QR) ---
+    // Calculate the bottom of the QR code
+    const qrBottom = currentY + qrSize;
+    
+    // Add a small gap (e.g., 25px)
+    const smallGap = 25; 
+    const barcodeY = qrBottom + smallGap;
+
+    ctx.drawImage(barcodeImg, 50, barcodeY, 600, 100);
 
     // --- 9. Instructions ---
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
-    ctx.fillText("Scan QR or Barcode at Entry", centerX, 830);
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, barcodeY + 130);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
