@@ -140,19 +140,29 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE
+// 🎟️ GENERATE FINAL IMAGE (UPDATED)
 // ==============================
 async function generateFinalImage(id) {
   try {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
+    
+    // LOGO PATH: Points to the ROOT folder where server.js is located
+    // Make sure you have a file named 'logo.png' there.
+    const logoPath = path.join(__dirname, 'logo.png'); 
 
     if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
       throw new Error("QR or Barcode file missing");
     }
 
     const qr = await loadImage(qrPath);
-    const barcode = await loadImage(barPath);
+    const barcode = await loadImage(barcode);
+    
+    // Load Logo (Check if it exists to prevent crash if missing)
+    let logo;
+    if (fs.existsSync(logoPath)) {
+      logo = await loadImage(logoPath);
+    }
 
     // HD SCALE
     const scale = 2;
@@ -163,25 +173,87 @@ async function generateFinalImage(id) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    // Background
+    // --- 1. Background ---
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, 700, 900);
 
-    // Title
+    // --- 2. BORDER ---
+    ctx.lineWidth = 2; 
+    ctx.strokeStyle = "#000";
+    ctx.strokeRect(2, 2, 696, 896);
+
+    const centerX = 350;
+
+    // --- 3. Header Section (Logo + Institute Name + Website) ---
+    
+    // Draw Logo
+    if (logo) {
+        ctx.drawImage(logo, 30, 20, 70, 70); 
+    }
+
+    // Institute Name
     ctx.fillStyle = "#000";
-    ctx.font = "bold 28px sans-serif";
-    ctx.fillText("Tushar Bhumkar Institute Pvt Ltd", 130, 60);
+    ctx.font = "bold 22px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("TBI TUSHAR BHUMKAR INSTITUTE PVT LTD", 120, 50);
 
-    ctx.font = "bold 32px sans-serif";
-    ctx.fillText("ENTRY PASS", 230, 120);
+    // Website URL
+    ctx.fillStyle = "#333";
+    ctx.font = "16px sans-serif";
+    ctx.fillText("WWW.TUSHARBHUMKAR.COM", 120, 75);
 
-    // Images
-    ctx.drawImage(qr, 200, 160, 300, 300);
-    ctx.drawImage(barcode, 50, 500, 600, 180);
+    // Decorative line below header
+    ctx.beginPath();
+    ctx.moveTo(30, 95);
+    ctx.lineTo(670, 95);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#e0e0e0";
+    ctx.stroke();
 
-    // Footer
-    ctx.font = "18px sans-serif";
-    ctx.fillText("Scan QR or Barcode at Entry", 160, 750);
+    // --- 4. Main Title (ENTRY PASS) ---
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 40px sans-serif";
+    
+    // Draw Box around ENTRY PASS
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(180, 115, 340, 55);
+    
+    ctx.fillText("ENTRY PASS", centerX, 152);
+
+    // --- 5. Images (QR & Barcode) ---
+    // QR Code
+    const qrSize = 250;
+    const qrX = centerX - (qrSize / 2);
+    ctx.drawImage(qr, qrX, 190, qrSize, qrSize);
+
+    // Barcode
+    ctx.drawImage(barcode, 50, 470, 600, 100);
+
+    // --- 6. Instructions ---
+    ctx.fillStyle = "#000";
+    ctx.font = "italic 18px sans-serif";
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, 620);
+
+    // Separator Line
+    ctx.beginPath();
+    ctx.moveTo(100, 640);
+    ctx.lineTo(600, 640);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#ccc";
+    ctx.stroke();
+
+    // --- 7. Footer Details ---
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillStyle = "#333"; // Dark grey for footer text
+    const footerStartY = 670;
+    const lineHeight = 25;
+
+    ctx.fillText("AUTHORIZED ENTRY ONLY", centerX, footerStartY);
+    ctx.fillText("VALID FOR ONE TIME USE", centerX, footerStartY + lineHeight);
+    ctx.fillStyle = "#4CAF50"; // Green for "Secure"
+    ctx.fillText("SECURE & VERIFIED", centerX, footerStartY + (lineHeight * 2));
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
