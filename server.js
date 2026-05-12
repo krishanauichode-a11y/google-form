@@ -38,7 +38,7 @@ const pool = new Pool({
 });
 
 // ==============================
-// 📁 TEMP STORAGE (FIXED FOR RENDER)
+// 📁 TEMP STORAGE
 // ==============================
 const tempDir = path.join(os.tmpdir(), "temp_passes");
 
@@ -103,7 +103,6 @@ app.post("/api/scan", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid barcode ID" });
     }
 
-    // 1. CHECK: Does this ID exist in the users table?
     const userResult = await pool.query(
       "SELECT * FROM users WHERE id = $1",
       [barcode_id]
@@ -115,18 +114,16 @@ app.post("/api/scan", async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // 2. STORE: Insert into scans table ONLY when scanned here
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info) 
        VALUES ($1, $2, $3)`,
       [
         barcode_id, 
         user.course_type, 
-        req.headers['user-agent'] // Logs the device used to verify
+        req.headers['user-agent'] 
       ]
     );
 
-    // 3. RETURN: Send back user data so the screen shows the correct name
     res.json({ 
       success: true, 
       data: user,
@@ -140,25 +137,25 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (UPDATED)
+// 🎟️ GENERATE FINAL IMAGE (BIG LOGO & PROFESSIONAL)
 // ==============================
 async function generateFinalImage(id) {
   try {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
     
-    // LOGO PATH: Points to the ROOT folder where server.js is located
-    // Make sure you have a file named 'logo.png' there.
+    // LOGO PATH: Points to ROOT folder
     const logoPath = path.join(__dirname, 'logo.png'); 
 
     if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
       throw new Error("QR or Barcode file missing");
     }
 
-    const qr = await loadImage(qrPath);
-    const barcode = await loadImage(barPath);
+    // Load images
+    const qrImage = await loadImage(qrPath);
+    const barcodeImg = await loadImage(barPath);
     
-    // Load Logo (Check if it exists to prevent crash if missing)
+    // Load Logo
     let logo;
     if (fs.existsSync(logoPath)) {
       logo = await loadImage(logoPath);
@@ -177,83 +174,64 @@ async function generateFinalImage(id) {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, 700, 900);
 
-    // --- 2. BORDER ---
-    ctx.lineWidth = 2; 
-    ctx.strokeStyle = "#000";
-    ctx.strokeRect(2, 2, 696, 896);
+    // --- 2. PROFESSIONAL BORDER (Navy Blue) ---
+    const primaryColor = "#003366"; // Navy Blue
+    ctx.lineWidth = 20; 
+    ctx.strokeStyle = primaryColor;
+    ctx.strokeRect(10, 10, 680, 880);
 
+    // Center Alignment Helper
     const centerX = 350;
 
-    // --- 3. Header Section (Logo + Institute Name + Website) ---
+    // --- 3. Header Section (BIG LOGO + Institute Name) ---
     
-    // Draw Logo
+    // Draw Logo (BIG SIZE: 160x160)
     if (logo) {
-        ctx.drawImage(logo, 30, 20, 70, 70); 
+        ctx.drawImage(logo, 50, 50, 160, 160); 
     }
 
-    // Institute Name
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 22px sans-serif";
+    // Institute Name (Positioned right of logo)
     ctx.textAlign = "left";
-    ctx.fillText("TBI TUSHAR BHUMKAR INSTITUTE PVT LTD", 120, 50);
+    ctx.fillStyle = primaryColor;
+    ctx.font = "bold 28px Arial"; // Slightly larger font
+    ctx.fillText("Tushar Bhumkar Institute", 240, 90);
 
-    // Website URL
-    ctx.fillStyle = "#333";
-    ctx.font = "16px sans-serif";
-    ctx.fillText("WWW.TUSHARBHUMKAR.COM", 120, 75);
+    // Subtitle
+    ctx.font = "22px Arial";
+    ctx.fillStyle = "#555";
+    ctx.fillText("PVT. LTD.", 240, 125);
 
-    // Decorative line below header
+    // Website (Grey, smaller)
+    ctx.font = "italic 18px Arial";
+    ctx.fillStyle = "#777";
+    ctx.fillText("WWW.TUSHARBHUMKAR.COM", 240, 155);
+
+    // Divider Line
     ctx.beginPath();
-    ctx.moveTo(30, 95);
-    ctx.lineTo(670, 95);
+    ctx.moveTo(50, 235); // Extended line to cover big logo width
+    ctx.lineTo(650, 235);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
 
     // --- 4. Main Title (ENTRY PASS) ---
     ctx.textAlign = "center";
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 40px sans-serif";
-    
-    // Draw Box around ENTRY PASS
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(180, 115, 340, 55);
-    
-    ctx.fillText("ENTRY PASS", centerX, 152);
+    ctx.fillStyle = primaryColor;
+    ctx.font = "bold 50px Arial"; // Large title
+    ctx.fillText("ENTRY PASS", centerX, 290);
 
-    // --- 5. Images (QR & Barcode) ---
-    // QR Code
-    const qrSize = 250;
+    // --- 5. QR Code ---
+    const qrSize = 320; // Slightly larger
     const qrX = centerX - (qrSize / 2);
-    ctx.drawImage(qr, qrX, 190, qrSize, qrSize);
+    ctx.drawImage(qrImage, qrX, 320, qrSize, qrSize);
 
-    // Barcode
-    ctx.drawImage(barcode, 50, 470, 600, 100);
+    // --- 6. Barcode ---
+    ctx.drawImage(barcodeImg, 50, 680, 600, 100);
 
-    // --- 6. Instructions ---
+    // --- 7. Instructions (No Footer Text) ---
     ctx.fillStyle = "#000";
-    ctx.font = "italic 18px sans-serif";
-    ctx.fillText("Scan QR or Barcode at Entry", centerX, 620);
-
-    // Separator Line
-    ctx.beginPath();
-    ctx.moveTo(100, 640);
-    ctx.lineTo(600, 640);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "#ccc";
-    ctx.stroke();
-
-    // --- 7. Footer Details ---
-    ctx.font = "bold 16px sans-serif";
-    ctx.fillStyle = "#333"; // Dark grey for footer text
-    const footerStartY = 670;
-    const lineHeight = 25;
-
-    ctx.fillText("AUTHORIZED ENTRY ONLY", centerX, footerStartY);
-    ctx.fillText("VALID FOR ONE TIME USE", centerX, footerStartY + lineHeight);
-    ctx.fillStyle = "#4CAF50"; // Green for "Secure"
-    ctx.fillText("SECURE & VERIFIED", centerX, footerStartY + (lineHeight * 2));
+    ctx.font = "italic 20px Arial";
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, 830);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
@@ -272,7 +250,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER (GENERATION ONLY - NO SCAN LOG)
+// 👤 CREATE USER
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -287,7 +265,6 @@ app.post("/create", async (req, res) => {
 
     const id = generateShortId(); 
 
-    // 1. Insert User into 'users' table
     await pool.query(
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
@@ -308,12 +285,8 @@ app.post("/create", async (req, res) => {
       ]
     );
 
-    // ❌ NO INSERT INTO 'SCANS' HERE.
-    // We only log to 'scans' when the physical machine scans it.
-
     const longUrl = `https://google-form-kebh.onrender.com/user/${id}`;
 
-    // HIGH QUALITY QR (Contains full URL to open directly on phone)
     const qrBuffer = await QRCode.toBuffer(longUrl, {
       width: 600, 
       margin: 2,
@@ -321,12 +294,11 @@ app.post("/create", async (req, res) => {
     });
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), qrBuffer);
 
-    // ✅ BARCODE (Contains ONLY ID, no URL)
     const barcodeBuffer = await bwipjs.toBuffer({
       bcid: "code128",
-      text: id,          // 1. Encodes ONLY the 7-char ID
-      alttext: id,       // 2. Prints ONLY the 7-char ID
-      scale: 3,          // 3. Thick lines for easy scanning
+      text: id,
+      alttext: id,
+      scale: 3,
       height: 25,
       includetext: true,
       textxalign: "center",
@@ -415,7 +387,6 @@ app.post("/share-interakt", async (req, res) => {
 
     const user = result.rows[0];
 
-    // Ensure final image exists
     const finalImageUrl = `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 
     const response = await fetch("https://api.interakt.ai/v1/public/message/", {
@@ -480,7 +451,7 @@ function checkAdmin(req, res) {
 }
 
 // ==============================
-// 👤 USER PAGE (PROTECTED & SCANNER ENABLED)
+// 👤 USER PAGE
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
