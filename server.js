@@ -200,16 +200,16 @@ async function generateFinalImage(id) {
     }
 
     // 4. GREY INFO BAR (From Reference Image)
-    const barHeight = 40;
-    ctx.fillStyle = "#f4f4f4"; // Light Grey
-    ctx.fillRect(20, currentY, 660, barHeight);
+    // const barHeight = 40;
+    // ctx.fillStyle = "#f4f4f4"; // Light Grey
+    // ctx.fillRect(20, currentY, 660, barHeight);
     
-    ctx.fillStyle = "#333";
-    ctx.textAlign = "center";
-    ctx.font = "bold 16px Arial";
-    ctx.fillText("For More Information Call Us On 92 72 000 111", centerX, currentY + 25);
+    // ctx.fillStyle = "#333";
+    // ctx.textAlign = "center";
+    // ctx.font = "bold 16px Arial";
+    // ctx.fillText("For More Information Call Us On 92 72 000 111", centerX, currentY + 25);
     
-    currentY += barHeight + 30; // Move down after info bar
+    // currentY += barHeight + 30; // Move down after info bar
 
     // 5. WEBSITE URL
     ctx.fillStyle = primaryColor;
@@ -248,10 +248,10 @@ async function generateFinalImage(id) {
     ctx.fillText("Scan QR or Barcode at Entry", centerX, currentY);
 
     // 11. WEBSITE FOOTER (Repeated at bottom like reference)
-    currentY += 50;
-    ctx.fillStyle = "#888";
-    ctx.font = "14px Arial";
-    ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
+    // currentY += 50;
+    // ctx.fillStyle = "#888";
+    // ctx.font = "14px Arial";
+    // ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
 
     // Save
     const finalPath = path.join(tempDir, `${id}-final.png`);
