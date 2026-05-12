@@ -187,7 +187,7 @@ async function generateFinalImage(id) {
     
     // Draw Logo (BIG SIZE: 160x160)
     if (logo) {
-        ctx.drawImage(logo, 50, 50, 160, 160); 
+        ctx.drawImage(logo, 50, 50, 180, 180); 
     }
 
     // Institute Name (Positioned right of logo)
@@ -198,11 +198,11 @@ async function generateFinalImage(id) {
 
     // Subtitle
     ctx.font = "22px Arial";
-    ctx.fillStyle = "#555";
-    ctx.fillText("PVT. LTD.", 240, 125);
+    ctx.fillStyle = "primaryColor";
+    ctx.fillText("Pvt. Ltd.", 240, 125);
 
     // Website (Grey, smaller)
-    ctx.font = "italic 18px Arial";
+    ctx.font = "18px Arial";
     ctx.fillStyle = "#777";
     ctx.fillText("WWW.TUSHARBHUMKAR.COM", 240, 155);
 
@@ -216,8 +216,14 @@ async function generateFinalImage(id) {
 
     // --- 4. Main Title (ENTRY PASS) ---
     ctx.textAlign = "center";
+    
+    // Draw the Border Box
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = primaryColor;
+    ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
+
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 50px Arial"; // Large title
+    ctx.font = "bold 50px Arial"; 
     ctx.fillText("ENTRY PASS", centerX, 290);
 
     // --- 5. QR Code ---
