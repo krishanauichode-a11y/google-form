@@ -137,14 +137,14 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (CENTERED LAYOUT)
+// 🎟️ GENERATE FINAL IMAGE (BIG LOGO, NO NUMBER)
 // ==============================
 async function generateFinalImage(id) {
   try {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
     
-    // LOGO PATH: Points to ROOT folder
+    // LOGO PATH
     const logoPath = path.join(__dirname, 'logo.png'); 
 
     if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
@@ -180,55 +180,50 @@ async function generateFinalImage(id) {
     ctx.strokeStyle = primaryColor;
     ctx.strokeRect(10, 10, 680, 880);
 
-    // Center Alignment Helper
     const centerX = 350;
 
-    // --- 3. Header Section (LOGO CENTERED) ---
+    // --- 3. Header Section (BIG LOGO + WEBSITE ONLY) ---
     
-    // Draw Logo (Centered at top)
+    // Draw Logo (Big)
+    const logoSize = 230;
+    const logoX = centerX - (logoSize / 2);
     if (logo) {
-        // Center X calculation: 350 - (160 width / 2) = 270
-        ctx.drawImage(logo, 270, 40, 180, 180); 
+        ctx.drawImage(logo, logoX, 30, logoSize, logoSize); // Ends at y=260
     }
 
-    // Website (Centered below logo)
+    // Website
     ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 20px Arial";
-    ctx.fillText("www.tusharbhumkar.com", centerX, 220);
+    ctx.font = "bold 18px Arial";
+    ctx.fillText("www.tusharbhumkar.com", centerX, 280);
 
-    // Divider Line
+    // Divider Line (Moved up to remove gap)
     ctx.beginPath();
-    ctx.moveTo(50, 240); // Line moved down
-    ctx.lineTo(650, 240);
+    ctx.moveTo(150, 295); 
+    ctx.lineTo(550, 295);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "#e0e0e0";
+    ctx.strokeStyle = primaryColor;
     ctx.stroke();
 
     // --- 4. Main Title (ENTRY PASS) ---
+    // Moved up to sit closer to the line
     ctx.textAlign = "center";
-    
-    // Draw the Border Box
-    // ctx.lineWidth = 2;
-    // ctx.strokeStyle = primaryColor;
-    // ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
-
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 50px Arial"; 
-    ctx.fillText("ENTRY PASS", centerX, 290);
+    ctx.font = "bold 45px Arial"; 
+    ctx.fillText("ENTRY PASS", centerX, 330);
 
     // --- 5. QR Code ---
-    const qrSize = 320; 
+    const qrSize = 280; 
     const qrX = centerX - (qrSize / 2);
-    ctx.drawImage(qrImage, qrX, 320, qrSize, qrSize);
+    ctx.drawImage(qrImage, qrX, 345, qrSize, qrSize); // Moved up to y=345
 
     // --- 6. Barcode ---
-    ctx.drawImage(barcodeImg, 50, 680, 600, 100);
+    ctx.drawImage(barcodeImg, 100, 670, 500, 90);
 
     // --- 7. Instructions ---
     ctx.fillStyle = "#000";
-    ctx.font = "italic 20px Arial";
-    ctx.fillText("Scan QR or Barcode at Entry", centerX, 830);
+    ctx.font = "italic 18px Arial";
+    ctx.fillText("Scan QR or Barcode at Entry", centerX, 800);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
 
