@@ -137,7 +137,7 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (BIG LOGO & PROFESSIONAL)
+// 🎟️ GENERATE FINAL IMAGE (CENTERED LAYOUT)
 // ==============================
 async function generateFinalImage(id) {
   try {
@@ -183,33 +183,24 @@ async function generateFinalImage(id) {
     // Center Alignment Helper
     const centerX = 350;
 
-    // --- 3. Header Section (BIG LOGO + Institute Name) ---
+    // --- 3. Header Section (LOGO CENTERED) ---
     
-    // Draw Logo (BIG SIZE: 160x160)
+    // Draw Logo (Centered at top)
     if (logo) {
-        ctx.drawImage(logo, 50, 50, 180, 180); 
+        // Center X calculation: 350 - (160 width / 2) = 270
+        ctx.drawImage(logo, 270, 40, 200, 200); 
     }
 
-    // Institute Name (Positioned right of logo)
-    ctx.textAlign = "left";
+    // Website (Centered below logo)
+    ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 28px Arial"; // Slightly larger font
-    ctx.fillText("Tushar Bhumkar Institute", 240, 90);
-
-    // Subtitle
-    ctx.font = "22px Arial";
-    ctx.fillStyle = "primaryColor";
-    ctx.fillText("Pvt. Ltd.", 240, 125);
-
-    // Website (Grey, smaller)
-    ctx.font = "18px Arial";
-    ctx.fillStyle = "#777";
-    ctx.fillText("WWW.TUSHARBHUMKAR.COM", 240, 155);
+    ctx.font = "bold 20px Arial";
+    ctx.fillText("WWW.TUSHARBHUMKAR.COM", centerX, 220);
 
     // Divider Line
     ctx.beginPath();
-    ctx.moveTo(50, 235); // Extended line to cover big logo width
-    ctx.lineTo(650, 235);
+    ctx.moveTo(50, 240); // Line moved down
+    ctx.lineTo(650, 240);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
@@ -218,23 +209,23 @@ async function generateFinalImage(id) {
     ctx.textAlign = "center";
     
     // Draw the Border Box
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = primaryColor;
-    ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
+    // ctx.lineWidth = 2;
+    // ctx.strokeStyle = primaryColor;
+    // ctx.strokeRect(centerX - 160, 290 - 50, 320, 60);
 
     ctx.fillStyle = primaryColor;
-    ctx.font = "bold 30px Arial"; 
+    ctx.font = "bold 50px Arial"; 
     ctx.fillText("ENTRY PASS", centerX, 290);
 
     // --- 5. QR Code ---
-    const qrSize = 320; // Slightly larger
+    const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
     ctx.drawImage(qrImage, qrX, 320, qrSize, qrSize);
 
     // --- 6. Barcode ---
     ctx.drawImage(barcodeImg, 50, 680, 600, 100);
 
-    // --- 7. Instructions (No Footer Text) ---
+    // --- 7. Instructions ---
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
     ctx.fillText("Scan QR or Barcode at Entry", centerX, 830);
