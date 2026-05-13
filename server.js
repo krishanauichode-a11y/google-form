@@ -93,7 +93,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==============================
-// 📡 API: LOG BARCODE SCANS (MACHINE ENTRY)
+// 📡 API: LOG BARCODE SCANS (MACHINE ENTRY) - TIMEZONE FIX
 // ==============================
 app.post("/api/scan", async (req, res) => {
   try {
@@ -114,13 +114,16 @@ app.post("/api/scan", async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // ✅ NEW: Update the 'date' column in the users table to the current scan time
+    // ✅ FIX: Asia/Kolkata Time, No Milliseconds, No Timezone Offset
+    // Format: 2026-05-13 14:47:05
     await pool.query(
-      `UPDATE users SET date = CURRENT_TIMESTAMP WHERE id = $1`,
+      `UPDATE users 
+       SET date = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') 
+       WHERE id = $1`,
       [barcode_id]
     );
 
-    // Log the scan details in the 'scans' table (for history/logs)
+    // Log the scan in the 'scans' history table
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info) 
        VALUES ($1, $2, $3)`,
