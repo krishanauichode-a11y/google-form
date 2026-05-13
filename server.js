@@ -475,7 +475,7 @@ function checkAdmin(req, res) {
 }
 
 // ==============================
-// 👤 USER PAGE
+// 👤 USER PAGE (UPDATED)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -492,15 +492,16 @@ app.get("/user/:id", async (req, res) => {
 
     const u = result.rows[0];
 
+    // Helper to handle empty images on initial load
+    const getImgSrc = (url) => url || "https://via.placeholder.com/150?text=No+Image";
+
     res.send(`
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verified Student</title>
-
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-
 <style>
 * {
   margin:0;
@@ -733,21 +734,18 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
 <body>
 
-  <!-- SCANNER INPUT (Visible for scanning) -->
   <div class="scanner-box">
     <input type="text" id="scanInput" placeholder="Scan Barcode..." autocomplete="off" spellcheck="false" />
   </div>
 
   <div class="card">
-
     <div class="card-header">
-    <h2>TUSHAR BHUMKAR INSTITUTE</h2>
+      <h2>TUSHAR BHUMKAR INSTITUTE</h2>
       <h2>Student Entry Pass</h2>
       <div class="badge">✔ VERIFIED</div>
     </div>
 
     <div class="card-body">
-      <!-- Grid layout with 3 columns -->
       <div class="info-container">
         <div class="info-item">
           <div class="info-label">Name</div>
@@ -763,103 +761,60 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         </div>
         
         <div class="info-item">
-          <div class="info-label">DOB</div>
-          <div class="info-value" id="u-dob">${u.dob}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Market</div>
-          <div class="info-value" id="u-market">${u.trading_market}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Type</div>
-          <div class="info-value" id="u-type">${u.trading_type}</div>
-        </div>
-        
-        <div class="info-item">
-          <div class="info-label">Source</div>
-          <div class="info-value" id="u-source">${u.source}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Software</div>
-          <div class="info-value" id="u-software">${u.software_used}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Level</div>
-          <div class="info-value" id="u-level">${u.level}</div>
-        </div>
-        
-        <div class="info-item">
-          <div class="info-label">Paid</div>
-          <div class="info-value" id="u-amount">₹ ${u.amount}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Mode</div>
-          <div class="info-value" id="u-mode">${u.payment_mode}</div>
-        </div>
-
-        <div class="info-item">
           <div class="info-label">Course Type</div>
           <div class="info-value" id="u-course">${u.course_type}</div>
         </div>
       </div>
 
-      <div style="margin-top:25px;">
-        <h3 style="margin-bottom:10px;">Verification</h3>
-
-        <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
-          
-          <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
-            <img id="u-selfie" src="${u.selfie_image}" 
-                 style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
-          </div>
-
-          <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Payment</div>
-            <img id="u-payment" src="${u.payment_image}" 
-                 style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd;" />
-          </div>
-
+      <div style="margin-top:25px; display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
+        
+        <!-- SELFIE: Wrapped in link for debugging -->
+        <div style="text-align:center;">
+          <div style="font-size:14px; margin-bottom:5px;">Selfie (Click to test)</div>
+          <a href="${getImgSrc(u.selfie_image)}" target="_blank" class="img-link">
+            <img id="u-selfie" src="${getImgSrc(u.selfie_image)}" 
+                 onerror="this.src='https://via.placeholder.com/150?text=Error'; this.style.border='2px solid red'"
+                 style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          </a>
         </div>
+
+        <!-- PAYMENT: Wrapped in link for debugging -->
+        <div style="text-align:center;">
+          <div style="font-size:14px; margin-bottom:5px;">Payment (Click to test)</div>
+          <a href="${getImgSrc(u.payment_image)}" target="_blank" class="img-link">
+            <img id="u-payment" src="${getImgSrc(u.payment_image)}" 
+                 onerror="this.src='https://via.placeholder.com/150?text=Error'; this.style.border='2px solid red'"
+                 style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          </a>
+        </div>
+
       </div>
 
-      <div class="status">✔ Valid Entry Approved</div>
+      <div class="status">✔ Scan logged - Valid Entry Approved</div>
       <div id="error-display" class="error-msg">❌ Invalid ID</div>
 
     </div>
-
-    <div class="card-footer">
-      Scan QR / Barcode at Entry Gate
-    </div>
-
   </div>
 
   <script>
     const input = document.getElementById('scanInput');
     const error = document.getElementById('error-display');
 
-    // ✅ CRITICAL FIX: Force Focus Loop
-    // This runs every 100ms to ensure focus is ALWAYS on the input
+    // Force Focus Loop
     setInterval(() => {
       if (document.activeElement !== input) {
         input.focus();
       }
     }, 100);
 
-    // Listen for Enter key (Scan Complete)
     input.addEventListener('keydown', async function (e) {
-      // Supports Enter or Tab keys at end of scan
       if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault(); // Prevent tab from moving focus
-        
+        e.preventDefault();
         const id = input.value.trim();
-        input.value = ''; // Clear input immediately
+        input.value = '';
         
         if (id) {
-          // Update URL without reloading (pushState)
           window.history.pushState({ id: id }, "", "/user/" + id);
-          
-          // Fetch new data
           await loadUserData(id);
         }
       }
@@ -867,6 +822,8 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
     async function loadUserData(id) {
       try {
+        console.log("🔍 Scanning ID:", id); // Debug log
+
         const res = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -875,27 +832,42 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         
         const json = await res.json();
 
+        console.log("📦 Server Response:", json); // Debug log - CHECK THIS IN CONSOLE (F12)
+
         if (json.success) {
           const u = json.data;
           error.style.display = 'none';
           
-          // Update DOM elements with new data
+          // Update Text Fields
           document.getElementById('u-full_name').innerText = u.full_name;
           document.getElementById('u-email').innerText = u.email;
           document.getElementById('u-phone').innerText = u.phone;
-          document.getElementById('u-dob').innerText = u.dob;
-          document.getElementById('u-market').innerText = u.trading_market;
-          document.getElementById('u-type').innerText = u.trading_type;
-          document.getElementById('u-source').innerText = u.source;
-          document.getElementById('u-software').innerText = u.software_used;
-          document.getElementById('u-level').innerText = u.level;
-          document.getElementById('u-amount').innerText = '₹ ' + u.amount;
-          document.getElementById('u-mode').innerText = u.payment_mode;
-          document.getElementById('u-selfie').src = u.selfie_image;
-          document.getElementById('u-payment').src = u.payment_image;
           document.getElementById('u-course').innerText = u.course_type;
 
-          // Update status message
+          // ✅ SAFE IMAGE UPDATE
+          const selfieImg = document.getElementById('u-selfie');
+          const selfieLink = selfieImg.parentElement;
+          const paymentImg = document.getElementById('u-payment');
+          const paymentLink = paymentImg.parentElement;
+
+          if (u.selfie_image && u.selfie_image.length > 10) {
+              selfieImg.src = u.selfie_image;
+              selfieLink.href = u.selfie_image;
+              selfieImg.style.border = "1px solid #ddd";
+          } else {
+              selfieImg.src = "https://via.placeholder.com/150?text=No+Selfie";
+              selfieLink.href = "#";
+          }
+
+          if (u.payment_image && u.payment_image.length > 10) {
+              paymentImg.src = u.payment_image;
+              paymentLink.href = u.payment_image;
+              paymentImg.style.border = "1px solid #ddd";
+          } else {
+              paymentImg.src = "https://via.placeholder.com/150?text=No+Payment";
+              paymentLink.href = "#";
+          }
+
           document.querySelector('.status').innerText = "✅ Scan logged - Valid Entry Approved";
           
         } else {
@@ -903,7 +875,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           document.querySelector('.status').innerText = "❌ Invalid Barcode";
         }
       } catch (err) {
-        console.error(err);
+        console.error("❌ Frontend Error:", err);
         error.style.display = 'block';
         document.querySelector('.status').innerText = "❌ Scan Error";
       }
@@ -919,7 +891,6 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
     res.send("Error loading user");
   }
 });
-
 // ==============================
 // 🚀 START SERVER
 // ==============================
