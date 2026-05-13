@@ -114,6 +114,13 @@ app.post("/api/scan", async (req, res) => {
 
     const user = userResult.rows[0];
 
+    // ✅ NEW: Update the 'date' column in the users table to the current scan time
+    await pool.query(
+      `UPDATE users SET date = CURRENT_TIMESTAMP WHERE id = $1`,
+      [barcode_id]
+    );
+
+    // Log the scan details in the 'scans' table (for history/logs)
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info) 
        VALUES ($1, $2, $3)`,
@@ -135,7 +142,6 @@ app.post("/api/scan", async (req, res) => {
     res.status(500).json({ success: false, message: "Scan logging failed" });
   }
 });
-
 // ==============================
 // 🎟️ GENERATE FINAL IMAGE (REDUCED MIDDLE GAP)
 // ==============================
