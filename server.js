@@ -283,7 +283,7 @@ app.post("/create", async (req, res) => {
     const {
       fullName, address, email, phone, dob, date,
       tradingMarket, tradingType, 
-      softwareUsed, previousCourse,
+      softwareUsed,
       amount, paymentMode,
       selfieImage, paymentImage,
       aadharFrontImage, aadharBackImage, // NEW: Added Aadhar images
@@ -297,17 +297,17 @@ app.post("/create", async (req, res) => {
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
         trading_market, trading_type,
-        software_used, previous_course,
+        software_used,
         amount, payment_mode,
         selfie_image, payment_image,
         aadhar_front_image, aadhar_back_image, -- NEW
         course_type
       )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
       [
         id, fullName, address, email, phone, dob, date,
         tradingMarket, tradingType,
-        softwareUsed, previousCourse, 
+        softwareUsed,
         amount, paymentMode,
         selfieImage, paymentImage,
         aadharFrontImage, aadharBackImage, // NEW
