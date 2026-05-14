@@ -484,7 +484,7 @@ function checkAdmin(req, res) {
 }
 
 // ==============================
-// 👤 USER PAGE (UPDATED WITH MODAL)
+// 👤 USER PAGE (UPDATED FRONTEND WITH PAN & AADHAR)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -670,88 +670,6 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
   background-color: rgba(255,68,68,0.1);
 }
 
-/* ==============================
-   ✅ MODAL STYLES (NEW)
-   ============================== */
-
-.clickable-img {
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.clickable-img:hover {
-  transform: scale(1.05);
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-}
-
-/* The Modal (background) */
-.modal {
-  display: none; /* Hidden by default */
-  position: fixed; /* Stay in place */
-  z-index: 9999; /* Sit on top */
-  left: 0;
-  top: 0;
-  width: 100%; /* Full width */
-  height: 100%; /* Full height */
-  overflow: auto; /* Enable scroll if needed */
-  background-color: rgba(0,0,0,0.9); /* Black w/ opacity */
-  padding-top: 50px;
-  animation: fadeIn 0.3s;
-}
-
-/* Modal Content (Image) */
-.modal-content {
-  margin: auto;
-  display: block;
-  width: 80%;
-  max-width: 900px;
-  max-height: 90vh;
-  object-fit: contain;
-  border-radius: 5px;
-  animation-name: zoom;
-  animation-duration: 0.6s;
-}
-
-/* The Close Button */
-.close-modal {
-  position: absolute;
-  top: 15px;
-  right: 35px;
-  color: #f1f1f1;
-  font-size: 50px;
-  font-weight: bold;
-  transition: 0.3s;
-  cursor: pointer;
-  user-select: none;
-  z-index: 10000;
-}
-
-.close-modal:hover,
-.close-modal:focus {
-  color: #bbb;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-/* Animation */
-@keyframes zoom {
-  from {transform:scale(0)} 
-  to {transform:scale(1)}
-}
-
-/* Mobile Optimization for Modal */
-@media(max-width:767px){
-  .modal-content {
-    width: 100%;
-    max-width: 100%;
-  }
-  .close-modal {
-    right: 20px;
-    top: 10px;
-    font-size: 40px;
-  }
-}
-
 /* DESKTOP OPTIMIZATION */
 @media(min-width:768px){
   .scanner-box { margin-bottom: 30px; }
@@ -822,8 +740,16 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         </div>
         
         <div class="info-item">
+          <div class="info-label">Source</div>
+          <div class="info-value" id="u-source">${u.source}</div>
+        </div>
+        <div class="info-item">
           <div class="info-label">Software</div>
           <div class="info-value" id="u-software">${u.software_used}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Level</div>
+          <div class="info-value" id="u-level">${u.level}</div>
         </div>
         
         <div class="info-item">
@@ -842,44 +768,48 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
       </div>
 
       <div style="margin-top:25px;">
-        <h3 style="margin-bottom:10px;">Verification (Click to Enlarge)</h3>
+        <h3 style="margin-bottom:10px;">Verification</h3>
 
         <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
           
           <!-- SELFIE IMAGE -->
           <div style="text-align:center;">
             <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
-            <img id="u-selfie" class="clickable-img" src="${getImgSrc(u.selfie_image)}" 
-                 onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            <a href="${getImgSrc(u.selfie_image)}" target="_blank" style="text-decoration:none; display:block;">
+              <img id="u-selfie" src="${getImgSrc(u.selfie_image)}" 
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            </a>
           </div>
 
           <!-- PAYMENT IMAGE -->
           <div style="text-align:center;">
             <div style="font-size:14px; margin-bottom:5px;">Payment Proof</div>
-            <img id="u-payment" class="clickable-img" src="${getImgSrc(u.payment_image)}" 
-                 onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Pay'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            <a href="${getImgSrc(u.payment_image)}" target="_blank" style="text-decoration:none; display:block;">
+              <img id="u-payment" src="${getImgSrc(u.payment_image)}" 
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Pay'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            </a>
           </div>
 
-          <!-- PAN CARD IMAGE -->
+          <!-- ✅ NEW: PAN CARD IMAGE -->
           <div style="text-align:center;">
             <div style="font-size:14px; margin-bottom:5px;">Pan Card</div>
-            <img id="u-pan" class="clickable-img" src="${getImgSrc(u.pan_card_image)}" 
-                 onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Pan'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            <a href="${getImgSrc(u.pan_card_image)}" target="_blank" style="text-decoration:none; display:block;">
+              <img id="u-pan" src="${getImgSrc(u.pan_card_image)}" 
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Pan'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            </a>
           </div>
 
-          <!-- AADHAR CARD IMAGE -->
+          <!-- ✅ NEW: AADHAR CARD IMAGE -->
           <div style="text-align:center;">
             <div style="font-size:14px; margin-bottom:5px;">Aadhar Card</div>
-            <img id="u-aadhar" class="clickable-img" src="${getImgSrc(u.aadhar_card_image)}" 
-                 onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            <a href="${getImgSrc(u.aadhar_card_image)}" target="_blank" style="text-decoration:none; display:block;">
+              <img id="u-aadhar" src="${getImgSrc(u.aadhar_card_image)}" 
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            </a>
           </div>
 
         </div>
@@ -896,14 +826,6 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
 
   </div>
 
-  <!-- ==============================
-       ✅ MODAL HTML (NEW)
-       ============================== -->
-  <div id="imageModal" class="modal">
-    <span class="close-modal" onclick="closeModal()">&times;</span>
-    <img class="modal-content" id="modalImg">
-  </div>
-
   <script>
     const input = document.getElementById('scanInput');
     const error = document.getElementById('error-display');
@@ -914,34 +836,6 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         input.focus();
       }
     }, 100);
-
-    // ==============================
-    // ✅ MODAL LOGIC (NEW)
-    // ==============================
-    function openModal(src) {
-        var modal = document.getElementById("imageModal");
-        var modalImg = document.getElementById("modalImg");
-        
-        // If it's a placeholder, don't open modal (optional logic, kept simple here)
-        if(src.includes("placeholder")) return;
-
-        modal.style.display = "block";
-        modalImg.src = src;
-    }
-
-    function closeModal() {
-        document.getElementById("imageModal").style.display = "none";
-    }
-
-    // Close modal when clicking outside the image
-    window.onclick = function(event) {
-        var modal = document.getElementById("imageModal");
-        if (event.target == modal) {
-            modal.style.display = "none";
-        }
-    }
-    // ==============================
-
 
     input.addEventListener('keydown', async function (e) {
       if (e.key === 'Enter' || e.key === 'Tab') {
@@ -988,24 +882,24 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
 
-          // ✅ UPDATED IMAGE LOGIC (No link wrapper needed)
+          // ✅ SAFE IMAGE UPDATE LOGIC (UPDATED)
           const updateImage = (imgId, url, placeholder) => {
               const img = document.getElementById(imgId);
+              const link = img.parentElement;
               if (url && url.length > 10) {
                   img.src = url;
+                  link.href = url;
                   img.style.border = "1px solid #ddd";
-                  // Re-bind onclick just in case, though HTML structure is static
-                  img.onclick = function() { openModal(url); };
               } else {
                   img.src = placeholder;
-                  img.onclick = null; // Disable modal for placeholder
+                  link.href = "#";
               }
           };
 
           updateImage('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
           updateImage('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Pay");
-          updateImage('u-pan', u.pan_card_image, "https://via.placeholder.com/150?text=No+Pan");
-          updateImage('u-aadhar', u.aadhar_card_image, "https://via.placeholder.com/150?text=No+Aadhar");
+          updateImage('u-pan', u.pan_card_image, "https://via.placeholder.com/150?text=No+Pan");       // ✅ NEW
+          updateImage('u-aadhar', u.aadhar_card_image, "https://via.placeholder.com/150?text=No+Aadhar"); // ✅ NEW
 
           document.querySelector('.status').innerText = "✅ Scan logged - Valid Entry Approved";
           
@@ -1030,6 +924,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
     res.send("Error loading user");
   }
 });
+
 // ==============================
 // 🚀 START SERVER
 // ==============================
