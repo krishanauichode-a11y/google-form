@@ -276,7 +276,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER
+// 👤 CREATE USER (UPDATED WITH PAN & AADHAR)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -286,11 +286,14 @@ app.post("/create", async (req, res) => {
       softwareUsed, previousCourse, level,
       amount, paymentMode,
       selfieImage, paymentImage,
-      courseType
+      courseType,
+      panCardImage,       // ✅ NEW
+      aadharCardImage     // ✅ NEW
     } = req.body;
 
     const id = generateShortId(); 
 
+    // Updated SQL with 2 new fields ($19, $20)
     await pool.query(
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
@@ -298,16 +301,20 @@ app.post("/create", async (req, res) => {
         software_used, previous_course, level,
         amount, payment_mode,
         selfie_image, payment_image,
-        course_type
+        course_type, 
+        pan_card_image, 
+        aadhar_card_image
       )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
       [
         id, fullName, address, email, phone, dob, date,
         tradingMarket, tradingType, source,
         softwareUsed, previousCourse, level,
         amount, paymentMode,
         selfieImage, paymentImage,
-        courseType
+        courseType,
+        panCardImage,   // ✅ NEW
+        aadharCardImage // ✅ NEW
       ]
     );
 
@@ -477,7 +484,7 @@ function checkAdmin(req, res) {
 }
 
 // ==============================
-// 👤 USER PAGE (FIXED FRONTEND)
+// 👤 USER PAGE (UPDATED FRONTEND WITH PAN & AADHAR)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -767,21 +774,41 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           
           <!-- SELFIE IMAGE -->
           <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Selfie (Click to test)</div>
+            <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
             <a href="${getImgSrc(u.selfie_image)}" target="_blank" style="text-decoration:none; display:block;">
               <img id="u-selfie" src="${getImgSrc(u.selfie_image)}" 
-                   onerror="this.src='https://via.placeholder.com/150?text=Error'; this.style.border='2px solid red'"
-                   style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
             </a>
           </div>
 
           <!-- PAYMENT IMAGE -->
           <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Payment (Click to test)</div>
+            <div style="font-size:14px; margin-bottom:5px;">Payment Proof</div>
             <a href="${getImgSrc(u.payment_image)}" target="_blank" style="text-decoration:none; display:block;">
               <img id="u-payment" src="${getImgSrc(u.payment_image)}" 
-                   onerror="this.src='https://via.placeholder.com/150?text=Error'; this.style.border='2px solid red'"
-                   style="width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Pay'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            </a>
+          </div>
+
+          <!-- ✅ NEW: PAN CARD IMAGE -->
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Pan Card</div>
+            <a href="${getImgSrc(u.pan_card_image)}" target="_blank" style="text-decoration:none; display:block;">
+              <img id="u-pan" src="${getImgSrc(u.pan_card_image)}" 
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Pan'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+            </a>
+          </div>
+
+          <!-- ✅ NEW: AADHAR CARD IMAGE -->
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Aadhar Card</div>
+            <a href="${getImgSrc(u.aadhar_card_image)}" target="_blank" style="text-decoration:none; display:block;">
+              <img id="u-aadhar" src="${getImgSrc(u.aadhar_card_image)}" 
+                   onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'; this.style.border='2px solid red'"
+                   style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
             </a>
           </div>
 
@@ -855,31 +882,24 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
 
-          // ✅ SAFE IMAGE UPDATE LOGIC
-          const selfieImg = document.getElementById('u-selfie');
-          const selfieLink = selfieImg.parentElement;
-          const paymentImg = document.getElementById('u-payment');
-          const paymentLink = paymentImg.parentElement;
+          // ✅ SAFE IMAGE UPDATE LOGIC (UPDATED)
+          const updateImage = (imgId, url, placeholder) => {
+              const img = document.getElementById(imgId);
+              const link = img.parentElement;
+              if (url && url.length > 10) {
+                  img.src = url;
+                  link.href = url;
+                  img.style.border = "1px solid #ddd";
+              } else {
+                  img.src = placeholder;
+                  link.href = "#";
+              }
+          };
 
-          // Handle Selfie
-          if (u.selfie_image && u.selfie_image.length > 10) {
-              selfieImg.src = u.selfie_image;
-              selfieLink.href = u.selfie_image;
-              selfieImg.style.border = "1px solid #ddd";
-          } else {
-              selfieImg.src = "https://via.placeholder.com/150?text=No+Selfie";
-              selfieLink.href = "#";
-          }
-
-          // Handle Payment
-          if (u.payment_image && u.payment_image.length > 10) {
-              paymentImg.src = u.payment_image;
-              paymentLink.href = u.payment_image;
-              paymentImg.style.border = "1px solid #ddd";
-          } else {
-              paymentImg.src = "https://via.placeholder.com/150?text=No+Payment";
-              paymentLink.href = "#";
-          }
+          updateImage('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
+          updateImage('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Pay");
+          updateImage('u-pan', u.pan_card_image, "https://via.placeholder.com/150?text=No+Pan");       // ✅ NEW
+          updateImage('u-aadhar', u.aadhar_card_image, "https://via.placeholder.com/150?text=No+Aadhar"); // ✅ NEW
 
           document.querySelector('.status').innerText = "✅ Scan logged - Valid Entry Approved";
           
@@ -914,7 +934,7 @@ app.listen(PORT, () => {
 });
 
 // ==============================
-// 🗄️ INITIALIZE DATABASE TABLES
+// 🗄️ INITIALIZE DATABASE TABLES (UPDATED)
 // ==============================
 async function initializeDatabase() {
   const client = await pool.connect();
@@ -939,7 +959,9 @@ async function initializeDatabase() {
         payment_mode VARCHAR(50),
         selfie_image TEXT, 
         payment_image TEXT, 
-        course_type VARCHAR(100)
+        course_type VARCHAR(100),
+        pan_card_image TEXT,
+        aadhar_card_image TEXT
       );
     `);
     console.log("✅ Users table checked/initialized");
