@@ -843,10 +843,6 @@ app.get("/user/:id", async (req, res) => {
               <span class="info-value" id="u-type">${u.trading_type}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Level</span>
-              <span class="info-value" id="u-level">${u.level}</span>
-            </div>
-            <div class="info-item">
               <span class="info-label">Amount Paid</span>
               <span class="info-value" id="u-amount">₹ ${u.amount}</span>
             </div>
@@ -857,10 +853,6 @@ app.get("/user/:id", async (req, res) => {
             <div class="info-item">
               <span class="info-label">DOB</span>
               <span class="info-value" id="u-dob">${u.dob}</span>
-            </div>
-             <div class="info-item">
-              <span class="info-label">Source</span>
-              <span class="info-value" id="u-source">${u.source}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Software</span>
