@@ -740,16 +740,8 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         </div>
         
         <div class="info-item">
-          <div class="info-label">Source</div>
-          <div class="info-value" id="u-source">${u.source}</div>
-        </div>
-        <div class="info-item">
           <div class="info-label">Software</div>
           <div class="info-value" id="u-software">${u.software_used}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Level</div>
-          <div class="info-value" id="u-level">${u.level}</div>
         </div>
         
         <div class="info-item">
