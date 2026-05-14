@@ -781,16 +781,8 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
         </div>
         
         <div class="info-item">
-          <div class="info-label">Source</div>
-          <div class="info-value" id="u-source">${u.source}</div>
-        </div>
-        <div class="info-item">
           <div class="info-label">Software</div>
           <div class="info-value" id="u-software">${u.software_used}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Level</div>
-          <div class="info-value" id="u-level">${u.level}</div>
         </div>
         
         <div class="info-item">
@@ -913,9 +905,7 @@ input#scanInput::placeholder { color: rgba(255,255,255,0.7); }
           document.getElementById('u-dob').innerText = u.dob;
           document.getElementById('u-market').innerText = u.trading_market;
           document.getElementById('u-type').innerText = u.trading_type;
-          document.getElementById('u-source').innerText = u.source;
           document.getElementById('u-software').innerText = u.software_used;
-          document.getElementById('u-level').innerText = u.level;
           document.getElementById('u-amount').innerText = '₹ ' + u.amount;
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
@@ -1000,8 +990,6 @@ async function initializeDatabase() {
         trading_type VARCHAR(100),
         source VARCHAR(100),
         software_used VARCHAR(100),
-        previous_course VARCHAR(100),
-        level VARCHAR(100),
         amount NUMERIC,
         payment_mode VARCHAR(50),
         selfie_image TEXT, 
