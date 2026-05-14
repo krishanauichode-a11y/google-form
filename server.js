@@ -93,7 +93,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==============================
-// 📡 API: LOG BARCODE SCANS (MACHINE ENTRY) - TIMEZONE FIX
+// 📡 API: LOG BARCODE SCANS
 // ==============================
 app.post("/api/scan", async (req, res) => {
   try {
@@ -114,8 +114,6 @@ app.post("/api/scan", async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // ✅ FIX: Asia/Kolkata Time, No Milliseconds, No Timezone Offset
-    // Format: 2026-05-13 14:47:05
     await pool.query(
       `UPDATE users 
        SET date = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') 
@@ -123,7 +121,6 @@ app.post("/api/scan", async (req, res) => {
       [barcode_id]
     );
 
-    // Log the scan in the 'scans' history table
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info) 
        VALUES ($1, $2, $3)`,
@@ -147,31 +144,25 @@ app.post("/api/scan", async (req, res) => {
 });
 
 // ==============================
-// 🎟️ GENERATE FINAL IMAGE (REDUCED MIDDLE GAP)
+// 🎟️ GENERATE FINAL IMAGE
 // ==============================
 async function generateFinalImage(id) {
   try {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
-    
-    // LOGO PATH: Points to ROOT folder
     const logoPath = path.join(__dirname, 'logo.png'); 
 
     if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) {
       throw new Error("QR or Barcode file missing");
     }
 
-    // Load images
     const qrImage = await loadImage(qrPath);
     const barcodeImg = await loadImage(barPath);
-    
-    // Load Logo
     let logo;
     if (fs.existsSync(logoPath)) {
       logo = await loadImage(logoPath);
     }
 
-    // HD SCALE
     const scale = 2;
     const canvas = createCanvas(700 * scale, 900 * scale);
     const ctx = canvas.getContext("2d");
@@ -180,91 +171,64 @@ async function generateFinalImage(id) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    // --- 1. Background ---
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, 700, 900);
 
-    // --- 2. PROFESSIONAL BORDER (Navy Blue) ---
-    const primaryColor = "#003366"; // Navy Blue
+    const primaryColor = "#003366"; 
     ctx.lineWidth = 20; 
     ctx.strokeStyle = primaryColor;
     ctx.strokeRect(10, 10, 680, 880);
 
     const centerX = 350;
-    let currentY = 40; // Vertical tracker
+    let currentY = 40;
 
-    // --- 3. LOGO (BIGGER SIZE - Aspect Ratio Fixed) ---
     if (logo) {
-        // INCREASED SIZE: 300px wide, 200px high max
         const maxLogoWidth = 500; 
         const maxLogoHeight = 300;
-
-        // Calculate scale to fit inside the box without stretching
         const scaleFactor = Math.min(maxLogoWidth / logo.width, maxLogoHeight / logo.height);
-        
         const drawWidth = logo.width * scaleFactor;
         const drawHeight = logo.height * scaleFactor;
-        
-        // Center X calculation
         const logoX = centerX - (drawWidth / 2);
-
         ctx.drawImage(logo, logoX, currentY, drawWidth, drawHeight);
-        
-        // Move Y down below the logo + 15px padding
         currentY += drawHeight + 15; 
     }
 
-    // --- 4. Website Text ---
     ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 20px Arial";
     ctx.fillText("www.tusharbhumkar.com", centerX, currentY);
     currentY += 30; 
 
-    // --- 5. Divider Line ---
     ctx.beginPath();
     ctx.moveTo(50, currentY);
     ctx.lineTo(650, currentY);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
-    
-    // --- GAP: Big gap between Website/Divider and Entry Pass ---
     currentY += 70; 
 
-    // --- 6. Main Title (ENTRY PASS) ---
     ctx.textAlign = "center";
     ctx.fillStyle = primaryColor;
     ctx.font = "bold 50px Arial"; 
     ctx.fillText("ENTRY PASS", centerX, currentY);
     currentY += 50; 
 
-    // --- 7. QR Code ---
     const qrSize = 320; 
     const qrX = centerX - (qrSize / 2);
     ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
 
-    // --- 8. Barcode (REDUCED GAP - Moved Closer to QR) ---
-    // Calculate the bottom of the QR code
     const qrBottom = currentY + qrSize;
-    
-    // Add a small gap (e.g., 25px)
     const smallGap = 25; 
     const barcodeY = qrBottom + smallGap;
 
     ctx.drawImage(barcodeImg, 50, barcodeY, 600, 100);
 
-    // --- 9. Instructions ---
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
     ctx.fillText("Scan QR or Barcode at Entry", centerX, barcodeY + 130);
 
     const finalPath = path.join(tempDir, `${id}-final.png`);
-
-    const buffer = canvas.toBuffer("image/png", {
-      compressionLevel: 9
-    });
-    
+    const buffer = canvas.toBuffer("image/png", { compressionLevel: 9 });
     fs.writeFileSync(finalPath, buffer);
 
     return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
@@ -276,7 +240,7 @@ async function generateFinalImage(id) {
 }
 
 // ==============================
-// 👤 CREATE USER (UPDATED WITH PAN & AADHAR)
+// 👤 CREATE USER (UPDATED FOR AADHAR FRONT/BACK)
 // ==============================
 app.post("/create", async (req, res) => {
   try {
@@ -287,13 +251,13 @@ app.post("/create", async (req, res) => {
       amount, paymentMode,
       selfieImage, paymentImage,
       courseType,
-      panCardImage,       // ✅ NEW
-      aadharCardImage     // ✅ NEW
+      aadharFrontImage,  // ✅ UPDATED
+      aadharBackImage    // ✅ UPDATED
     } = req.body;
 
     const id = generateShortId(); 
 
-    // Updated SQL with 2 new fields ($19, $20)
+    // Updated SQL with new Aadhar fields
     await pool.query(
       `INSERT INTO users(
         id, full_name, address, email, phone, dob, date,
@@ -302,8 +266,8 @@ app.post("/create", async (req, res) => {
         amount, payment_mode,
         selfie_image, payment_image,
         course_type, 
-        pan_card_image, 
-        aadhar_card_image
+        aadhar_front_image, 
+        aadhar_back_image
       )
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
       [
@@ -313,8 +277,8 @@ app.post("/create", async (req, res) => {
         amount, paymentMode,
         selfieImage, paymentImage,
         courseType,
-        panCardImage,   // ✅ NEW
-        aadharCardImage // ✅ NEW
+        aadharFrontImage,   // ✅ UPDATED
+        aadharBackImage     // ✅ UPDATED
       ]
     );
 
@@ -355,16 +319,11 @@ app.post("/create", async (req, res) => {
 app.post("/send-email", async (req, res) => {
   try {
     const { id, email } = req.body;
-
     const result = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
     const user = result.rows[0];
-
     const finalImageUrl = await generateFinalImage(id);
-
     await sendEmail(email, user.full_name, finalImageUrl);
-
     res.json({ success: true });
-
   } catch (err) {
     console.error("❌ EMAIL ERROR:", err);
     res.status(500).json({ error: err.message });
@@ -377,14 +336,12 @@ app.post("/send-email", async (req, res) => {
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
-  secure: false, // TLS
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
-  tls: {
-    rejectUnauthorized: false
-  }
+  tls: { rejectUnauthorized: false }
 });
 
 async function sendEmail(to, name, imageUrl) {
@@ -392,11 +349,7 @@ async function sendEmail(to, name, imageUrl) {
     from: `"Tushar Bhumkar Institute" <${process.env.EMAIL_USER}>`,
     to: to,
     subject: "🎟️ Your Entry Pass",
-    html: `
-      <h2>Hello ${name},</h2>
-      <p>Your entry pass is ready.</p>
-      <img src="${imageUrl}" width="300"/>
-    `
+    html: `<h2>Hello ${name},</h2><p>Your entry pass is ready.</p><img src="${imageUrl}" width="300"/>`
   });
 }
 
@@ -406,20 +359,11 @@ async function sendEmail(to, name, imageUrl) {
 app.post("/share-interakt", async (req, res) => {
   try {
     const { id, phone } = req.body;
-
     const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-
-    const result = await pool.query(
-      "SELECT * FROM users WHERE id=$1",
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json({ success: false, message: "User not found" });
-    }
-
+    const result = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+    if (result.rows.length === 0) return res.json({ success: false, message: "User not found" });
+    
     const user = result.rows[0];
-
     const finalImageUrl = `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
 
     const response = await fetch("https://api.interakt.ai/v1/public/message/", {
@@ -435,19 +379,13 @@ app.post("/share-interakt", async (req, res) => {
         template: {
           name: "entry_pass",
           languageCode: "en",
-          bodyValues: [
-            String(user.full_name || "User"),
-            "Scan QR or Barcode at entry"
-          ],
+          bodyValues: [String(user.full_name || "User"), "Scan QR or Barcode at entry"],
           headerValues: [finalImageUrl]
         }
       })
     });
-
     const data = await response.json();
-
     res.json({ success: true, data });
-
   } catch (err) {
     console.error("❌ INTERAKT ERROR:", err);
     res.status(500).json({ error: err.message });
@@ -459,14 +397,11 @@ app.post("/share-interakt", async (req, res) => {
 // ==============================
 function checkAdmin(req, res) {
   const { p } = req.query;
-
   if (req.session.isAdmin) return true;
-
   if (p === process.env.ADMIN_PASS) {
     req.session.isAdmin = true;
     return true;
   }
-
   res.send(`
   <html>
   <body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
@@ -479,40 +414,28 @@ function checkAdmin(req, res) {
   </body>
   </html>
   `);
-
   return false;
 }
 
 // ==============================
-// 👤 USER PAGE (FULL PAGE - NO SCROLL LAYOUT)
+// 👤 USER PAGE (UPDATED FRONTEND WITH AADHAR FRONT/BACK MODAL)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
     if (!checkAdmin(req, res)) return;
-
-    const result = await pool.query(
-      "SELECT * FROM users WHERE id=$1",
-      [req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.send("<h2 style='color:white;text-align:center;font-family:sans-serif;margin-top:50px'>❌ Invalid QR</h2>");
-    }
+    const result = await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id]);
+    if (result.rows.length === 0) return res.send("<h2>❌ Invalid QR</h2>");
 
     const u = result.rows[0];
-
-    // Helper to handle empty images
     const getImgSrc = (url) => url || "https://via.placeholder.com/150?text=No+Image";
 
     res.send(`
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Entry Pass Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verified Student</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
   /* ==============================
      1. RESET & BASE STYLES
@@ -793,153 +716,107 @@ app.get("/user/:id", async (req, res) => {
 </head>
 
 <body>
-
-  <!-- 1. SCANNER INPUT (Fixed Top) -->
-  <div class="scanner-bar">
-    <input type="text" id="scanInput" placeholder="Scan Barcode / Enter ID..." autocomplete="off" spellcheck="false" />
+  <div class="scanner-box">
+    <input type="text" id="scanInput" placeholder="Scan Barcode..." autocomplete="off" spellcheck="false" />
   </div>
 
-  <!-- 2. MAIN CONTAINER -->
-  <div class="app-container">
-    <div class="card">
-      
-      <!-- HEADER -->
-      <div class="card-header">
-        <div class="header-titles">
-          <h1>TUSHAR BHUMKAR INSTITUTE</h1>
-          <h2>Student Entry Verification</h2>
-        </div>
-        <div class="verified-badge">✔ VERIFIED</div>
-      </div>
-
-      <!-- BODY: SPLIT LAYOUT -->
-      <div class="card-body no-scrollbar">
-        
-        <!-- LEFT: INFO GRID -->
-        <div class="data-panel no-scrollbar">
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">Full Name</span>
-              <span class="info-value" id="u-full_name">${u.full_name}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Phone</span>
-              <span class="info-value" id="u-phone">${u.phone}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Email</span>
-              <span class="info-value" id="u-email">${u.email}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Course</span>
-              <span class="info-value" id="u-course">${u.course_type}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Market</span>
-              <span class="info-value" id="u-market">${u.trading_market}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Type</span>
-              <span class="info-value" id="u-type">${u.trading_type}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Amount Paid</span>
-              <span class="info-value" id="u-amount">₹ ${u.amount}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Payment Mode</span>
-              <span class="info-value" id="u-mode">${u.payment_mode}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">DOB</span>
-              <span class="info-value" id="u-dob">${u.dob}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Software</span>
-              <span class="info-value" id="u-software">${u.software_used}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- RIGHT: IMAGES (2x2 Grid) -->
-        <div class="images-panel no-scrollbar">
-          
-          <!-- Selfie -->
-          <div class="img-card">
-            <div class="img-card-label">SELFIE</div>
-            <a href="${getImgSrc(u.selfie_image)}" target="_blank">
-              <div class="img-wrapper">
-                <img id="u-selfie" src="${getImgSrc(u.selfie_image)}" 
-                     onerror="this.src='https://via.placeholder.com/150?text=No+Image'" />
-              </div>
-            </a>
-          </div>
-
-          <!-- Payment -->
-          <div class="img-card">
-            <div class="img-card-label">PAYMENT PROOF</div>
-            <a href="${getImgSrc(u.payment_image)}" target="_blank">
-              <div class="img-wrapper">
-                <img id="u-payment" src="${getImgSrc(u.payment_image)}" 
-                     onerror="this.src='https://via.placeholder.com/150?text=No+Image'" />
-              </div>
-            </a>
-          </div>
-
-          <!-- PAN -->
-          <div class="img-card">
-            <div class="img-card-label">PAN CARD</div>
-            <a href="${getImgSrc(u.pan_card_image)}" target="_blank">
-              <div class="img-wrapper">
-                <img id="u-pan" src="${getImgSrc(u.pan_card_image)}" 
-                     onerror="this.src='https://via.placeholder.com/150?text=No+Pan'" />
-              </div>
-            </a>
-          </div>
-
-          <!-- AADHAR -->
-          <div class="img-card">
-            <div class="img-card-label">AADHAR CARD</div>
-            <a href="${getImgSrc(u.aadhar_card_image)}" target="_blank">
-              <div class="img-wrapper">
-                <img id="u-aadhar" src="${getImgSrc(u.aadhar_card_image)}" 
-                     onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'" />
-              </div>
-            </a>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- FOOTER -->
-      <div class="card-footer">
-        <span>System Status: <span style="color:#00c853">● Online</span></span>
-        <span class="status-msg" id="status-msg">Ready to Scan</span>
-      </div>
-
+  <div class="card">
+    <div class="card-header">
+      <h2>TUSHAR BHUMKAR INSTITUTE</h2>
+      <h2>Student Entry Pass</h2>
+      <div class="badge">✔ VERIFIED</div>
     </div>
+
+    <div class="card-body">
+      <div class="info-container">
+        <div class="info-item"><div class="info-label">Name</div><div class="info-value" id="u-full_name">${u.full_name}</div></div>
+        <div class="info-item"><div class="info-label">Email</div><div class="info-value" id="u-email">${u.email}</div></div>
+        <div class="info-item"><div class="info-label">Phone</div><div class="info-value" id="u-phone">${u.phone}</div></div>
+        <div class="info-item"><div class="info-label">DOB</div><div class="info-value" id="u-dob">${u.dob}</div></div>
+        <div class="info-item"><div class="info-label">Market</div><div class="info-value" id="u-market">${u.trading_market}</div></div>
+        <div class="info-item"><div class="info-label">Type</div><div class="info-value" id="u-type">${u.trading_type}</div></div>
+        <div class="info-item"><div class="info-label">Software</div><div class="info-value" id="u-software">${u.software_used}</div></div>
+        <div class="info-item"><div class="info-label">Paid</div><div class="info-value" id="u-amount">₹ ${u.amount}</div></div>
+        <div class="info-item"><div class="info-label">Mode</div><div class="info-value" id="u-mode">${u.payment_mode}</div></div>
+        <div class="info-item"><div class="info-label">Course Type</div><div class="info-value" id="u-course">${u.course_type}</div></div>
+      </div>
+
+      <div style="margin-top:25px;">
+        <h3 style="margin-bottom:10px;">Verification (Click to Enlarge)</h3>
+        <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
+          
+          <!-- SELFIE -->
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
+            <img id="u-selfie" class="clickable-img" src="${getImgSrc(u.selfie_image)}" onclick="openModal(this.src)"
+                 onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'; this.style.border='2px solid red'"
+                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          </div>
+
+          <!-- PAYMENT -->
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Payment Proof</div>
+            <img id="u-payment" class="clickable-img" src="${getImgSrc(u.payment_image)}" onclick="openModal(this.src)"
+                 onerror="this.src='https://via.placeholder.com/150?text=No+Pay'; this.style.border='2px solid red'"
+                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          </div>
+
+          <!-- ✅ AADHAR FRONT -->
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Aadhar Front</div>
+            <img id="u-aadhar-front" class="clickable-img" src="${getImgSrc(u.aadhar_front_image)}" onclick="openModal(this.src)"
+                 onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar+F'; this.style.border='2px solid red'"
+                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          </div>
+
+          <!-- ✅ AADHAR BACK -->
+          <div style="text-align:center;">
+            <div style="font-size:14px; margin-bottom:5px;">Aadhar Back</div>
+            <img id="u-aadhar-back" class="clickable-img" src="${getImgSrc(u.aadhar_back_image)}" onclick="openModal(this.src)"
+                 onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar+B'; this.style.border='2px solid red'"
+                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          </div>
+
+        </div>
+      </div>
+
+      <div class="status">✔ Valid Entry Approved</div>
+      <div id="error-display" class="error-msg">❌ Invalid ID</div>
+    </div>
+    <div class="card-footer">Scan QR / Barcode at Entry Gate</div>
   </div>
 
-  <!-- LOGIC -->
+  <!-- MODAL -->
+  <div id="imageModal" class="modal">
+    <span class="close-modal" onclick="closeModal()">&times;</span>
+    <img class="modal-content" id="modalImg">
+  </div>
+
   <script>
     const input = document.getElementById('scanInput');
-    const statusMsg = document.getElementById('status-msg');
-    const dataPanel = document.querySelector('.data-panel');
-    const imagesPanel = document.querySelector('.images-panel');
+    const error = document.getElementById('error-display');
+    setInterval(() => { if (document.activeElement !== input) { input.focus(); } }, 100);
 
-    // Force Focus Loop
-    setInterval(() => {
-      if (document.activeElement !== input) {
-        input.focus();
-      }
-    }, 100);
+    function openModal(src) {
+        if(src.includes("placeholder")) return;
+        var modal = document.getElementById("imageModal");
+        var modalImg = document.getElementById("modalImg");
+        modal.style.display = "block";
+        modalImg.src = src;
+    }
+    function closeModal() {
+        document.getElementById("imageModal").style.display = "none";
+    }
+    window.onclick = function(event) {
+        var modal = document.getElementById("imageModal");
+        if (event.target == modal) { modal.style.display = "none"; }
+    }
 
     input.addEventListener('keydown', async function (e) {
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
         const id = input.value.trim();
         input.value = '';
-        
         if (id) {
           window.history.pushState({ id: id }, "", "/user/" + id);
           await loadUserData(id);
@@ -948,23 +825,17 @@ app.get("/user/:id", async (req, res) => {
     });
 
     async function loadUserData(id) {
-      // Visual Feedback
-      statusMsg.innerText = "Scanning...";
-      statusMsg.style.color = "#e67e22";
-
       try {
         const res = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ barcode_id: id })
         });
-        
         const json = await res.json();
 
         if (json.success) {
           const u = json.data;
-          
-          // Update Text Fields
+          error.style.display = 'none';
           document.getElementById('u-full_name').innerText = u.full_name;
           document.getElementById('u-email').innerText = u.email;
           document.getElementById('u-phone').innerText = u.phone;
@@ -978,71 +849,55 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
 
-          // Safe Image Update
-          const updateImage = (id, url) => {
-            const img = document.getElementById(id);
-            const link = img.parentElement.parentElement;
-            if (url && url.length > 10) {
-                img.src = url;
-                link.href = url;
-                img.style.opacity = "1";
-            } else {
-                img.src = "https://via.placeholder.com/150?text=No+Image";
-                link.href = "#";
-                img.style.opacity = "0.5";
-            }
+          const updateImage = (imgId, url, placeholder) => {
+              const img = document.getElementById(imgId);
+              if (url && url.length > 10) {
+                  img.src = url;
+                  img.style.border = "1px solid #ddd";
+                  img.onclick = function() { openModal(url); };
+              } else {
+                  img.src = placeholder;
+                  img.onclick = null;
+              }
           };
 
-          updateImage('u-selfie', u.selfie_image);
-          updateImage('u-payment', u.payment_image);
-          updateImage('u-pan', u.pan_card_image);
-          updateImage('u-aadhar', u.aadhar_card_image);
+          updateImage('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
+          updateImage('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Pay");
+          updateImage('u-aadhar-front', u.aadhar_front_image, "https://via.placeholder.com/150?text=No+Aadhar+F");
+          updateImage('u-aadhar-back', u.aadhar_back_image, "https://via.placeholder.com/150?text=No+Aadhar+B");
 
-          statusMsg.innerText = "✅ " + u.full_name + " - Entry Approved";
-          statusMsg.style.color = "#00c853";
-
-          // Subtle flash effect on success
-          document.querySelector('.card').animate([
-            { boxShadow: '0 0 0 0 rgba(0, 200, 83, 0.7)' },
-            { boxShadow: '0 0 0 20px rgba(0, 200, 83, 0)' }
-          ], { duration: 500 });
-
+          document.querySelector('.status').innerText = "✅ Scan logged - Valid Entry Approved";
         } else {
-          statusMsg.innerText = "❌ Invalid ID or User Not Found";
-          statusMsg.style.color = "#e74c3c";
+          error.style.display = 'block';
+          document.querySelector('.status').innerText = "❌ Invalid Barcode";
         }
       } catch (err) {
-        console.error(err);
-        statusMsg.innerText = "❌ Connection Error";
-        statusMsg.style.color = "#e74c3c";
+        console.error("❌ Frontend Error:", err);
+        error.style.display = 'block';
+        document.querySelector('.status').innerText = "❌ Scan Error";
       }
     }
   </script>
-
 </body>
 </html>
     `);
-
   } catch (err) {
     console.error(err);
     res.send("Error loading user");
   }
 });
-// ==============================
-// 🚀 START SERVER
-// ==============================
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
 });
 
 // ==============================
-// 🗄️ INITIALIZE DATABASE TABLES (UPDATED)
+// 🗄️ INITIALIZE DATABASE TABLES
 // ==============================
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    // 1. Ensure 'users' table exists with correct columns
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(7) PRIMARY KEY,
@@ -1063,13 +918,12 @@ async function initializeDatabase() {
         selfie_image TEXT, 
         payment_image TEXT, 
         course_type VARCHAR(100),
-        pan_card_image TEXT,
-        aadhar_card_image TEXT
+        aadhar_front_image TEXT,
+        aadhar_back_image TEXT
       );
     `);
     console.log("✅ Users table checked/initialized");
 
-    // 2. Ensure 'scans' table exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS scans (
         id SERIAL PRIMARY KEY,
@@ -1080,7 +934,6 @@ async function initializeDatabase() {
       );
     `);
     console.log("✅ Scans table checked/initialized");
-
   } catch (err) {
     console.error("❌ Table initialization error:", err);
   } finally {
