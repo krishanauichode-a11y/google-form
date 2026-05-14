@@ -777,10 +777,6 @@ app.get("/user/:id", async (req, res) => {
               <span class="info-value" id="u-type">${u.trading_type}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Level</span>
-              <span class="info-value" id="u-level">${u.level}</span>
-            </div>
-            <div class="info-item">
               <span class="info-label">Amount Paid</span>
               <span class="info-value" id="u-amount">₹ ${u.amount}</span>
             </div>
@@ -791,10 +787,6 @@ app.get("/user/:id", async (req, res) => {
             <div class="info-item">
               <span class="info-label">DOB</span>
               <span class="info-value" id="u-dob">${u.dob}</span>
-            </div>
-             <div class="info-item">
-              <span class="info-label">Source</span>
-              <span class="info-value" id="u-source">${u.source}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Software</span>
@@ -856,7 +848,7 @@ app.get("/user/:id", async (req, res) => {
       <!-- FOOTER -->
       <div class="card-footer">
         <span>System Status: <span style="color:#00c853">● Online</span></span>
-        <span class="status-msg" id="status-msg">Ready to Scan</span>
+        // <span class="status-msg" id="status-msg">Ready to Scan</span>
       </div>
 
     </div>
@@ -865,7 +857,7 @@ app.get("/user/:id", async (req, res) => {
   <!-- LOGIC -->
   <script>
     const input = document.getElementById('scanInput');
-    const statusMsg = document.getElementById('status-msg');
+    // const statusMsg = document.getElementById('status-msg');
     const dataPanel = document.querySelector('.data-panel');
     const imagesPanel = document.querySelector('.images-panel');
 
@@ -913,9 +905,7 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-dob').innerText = u.dob;
           document.getElementById('u-market').innerText = u.trading_market;
           document.getElementById('u-type').innerText = u.trading_type;
-          document.getElementById('u-source').innerText = u.source;
           document.getElementById('u-software').innerText = u.software_used;
-          document.getElementById('u-level').innerText = u.level;
           document.getElementById('u-amount').innerText = '₹ ' + u.amount;
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
@@ -953,10 +943,6 @@ app.get("/user/:id", async (req, res) => {
           statusMsg.innerText = "❌ Invalid ID or User Not Found";
           statusMsg.style.color = "#e74c3c";
         }
-      } catch (err) {
-        console.error(err);
-        statusMsg.innerText = "❌ Connection Error";
-        statusMsg.style.color = "#e74c3c";
       }
     }
   </script>
