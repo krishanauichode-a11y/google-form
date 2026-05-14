@@ -418,24 +418,35 @@ function checkAdmin(req, res) {
 }
 
 // ==============================
-// 👤 USER PAGE (UPDATED FRONTEND WITH AADHAR FRONT/BACK MODAL)
+// 👤 USER PAGE (FULL PAGE - NO SCROLL - AADHAR FRONT/BACK)
 // ==============================
 app.get("/user/:id", async (req, res) => {
   try {
     if (!checkAdmin(req, res)) return;
-    const result = await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id]);
-    if (result.rows.length === 0) return res.send("<h2>❌ Invalid QR</h2>");
+
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.send("<h2 style='color:white;text-align:center;font-family:sans-serif;margin-top:50px'>❌ Invalid QR</h2>");
+    }
 
     const u = result.rows[0];
+
+    // Helper to handle empty images
     const getImgSrc = (url) => url || "https://via.placeholder.com/150?text=No+Image";
 
     res.send(`
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Verified Student</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Entry Pass Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
 <style>
   /* ==============================
      1. RESET & BASE STYLES
@@ -716,107 +727,161 @@ app.get("/user/:id", async (req, res) => {
 </head>
 
 <body>
-  <div class="scanner-box">
-    <input type="text" id="scanInput" placeholder="Scan Barcode..." autocomplete="off" spellcheck="false" />
+
+  <!-- 1. SCANNER INPUT (Fixed Top) -->
+  <div class="scanner-bar">
+    <input type="text" id="scanInput" placeholder="Scan Barcode / Enter ID..." autocomplete="off" spellcheck="false" />
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <h2>TUSHAR BHUMKAR INSTITUTE</h2>
-      <h2>Student Entry Pass</h2>
-      <div class="badge">✔ VERIFIED</div>
-    </div>
-
-    <div class="card-body">
-      <div class="info-container">
-        <div class="info-item"><div class="info-label">Name</div><div class="info-value" id="u-full_name">${u.full_name}</div></div>
-        <div class="info-item"><div class="info-label">Email</div><div class="info-value" id="u-email">${u.email}</div></div>
-        <div class="info-item"><div class="info-label">Phone</div><div class="info-value" id="u-phone">${u.phone}</div></div>
-        <div class="info-item"><div class="info-label">DOB</div><div class="info-value" id="u-dob">${u.dob}</div></div>
-        <div class="info-item"><div class="info-label">Market</div><div class="info-value" id="u-market">${u.trading_market}</div></div>
-        <div class="info-item"><div class="info-label">Type</div><div class="info-value" id="u-type">${u.trading_type}</div></div>
-        <div class="info-item"><div class="info-label">Software</div><div class="info-value" id="u-software">${u.software_used}</div></div>
-        <div class="info-item"><div class="info-label">Paid</div><div class="info-value" id="u-amount">₹ ${u.amount}</div></div>
-        <div class="info-item"><div class="info-label">Mode</div><div class="info-value" id="u-mode">${u.payment_mode}</div></div>
-        <div class="info-item"><div class="info-label">Course Type</div><div class="info-value" id="u-course">${u.course_type}</div></div>
+  <!-- 2. MAIN CONTAINER -->
+  <div class="app-container">
+    <div class="card">
+      
+      <!-- HEADER -->
+      <div class="card-header">
+        <div class="header-titles">
+          <h1>TUSHAR BHUMKAR INSTITUTE</h1>
+          <h2>Student Entry Verification</h2>
+        </div>
+        <div class="verified-badge">✔ VERIFIED</div>
       </div>
 
-      <div style="margin-top:25px;">
-        <h3 style="margin-bottom:10px;">Verification (Click to Enlarge)</h3>
-        <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
+      <!-- BODY: SPLIT LAYOUT -->
+      <div class="card-body no-scrollbar">
+        
+        <!-- LEFT: INFO GRID -->
+        <div class="data-panel no-scrollbar">
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Full Name</span>
+              <span class="info-value" id="u-full_name">${u.full_name}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Phone</span>
+              <span class="info-value" id="u-phone">${u.phone}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Email</span>
+              <span class="info-value" id="u-email">${u.email}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Course</span>
+              <span class="info-value" id="u-course">${u.course_type}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Market</span>
+              <span class="info-value" id="u-market">${u.trading_market}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Type</span>
+              <span class="info-value" id="u-type">${u.trading_type}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Level</span>
+              <span class="info-value" id="u-level">${u.level}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Amount Paid</span>
+              <span class="info-value" id="u-amount">₹ ${u.amount}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Payment Mode</span>
+              <span class="info-value" id="u-mode">${u.payment_mode}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">DOB</span>
+              <span class="info-value" id="u-dob">${u.dob}</span>
+            </div>
+             <div class="info-item">
+              <span class="info-label">Source</span>
+              <span class="info-value" id="u-source">${u.source}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Software</span>
+              <span class="info-value" id="u-software">${u.software_used}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: IMAGES (2x2 Grid) -->
+        <div class="images-panel no-scrollbar">
           
-          <!-- SELFIE -->
-          <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Selfie</div>
-            <img id="u-selfie" class="clickable-img" src="${getImgSrc(u.selfie_image)}" onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          <!-- Selfie -->
+          <div class="img-card">
+            <div class="img-card-label">SELFIE</div>
+            <a href="${getImgSrc(u.selfie_image)}" target="_blank">
+              <div class="img-wrapper">
+                <img id="u-selfie" src="${getImgSrc(u.selfie_image)}" 
+                     onerror="this.src='https://via.placeholder.com/150?text=No+Image'" />
+              </div>
+            </a>
           </div>
 
-          <!-- PAYMENT -->
-          <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Payment Proof</div>
-            <img id="u-payment" class="clickable-img" src="${getImgSrc(u.payment_image)}" onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Pay'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          <!-- Payment -->
+          <div class="img-card">
+            <div class="img-card-label">PAYMENT PROOF</div>
+            <a href="${getImgSrc(u.payment_image)}" target="_blank">
+              <div class="img-wrapper">
+                <img id="u-payment" src="${getImgSrc(u.payment_image)}" 
+                     onerror="this.src='https://via.placeholder.com/150?text=No+Image'" />
+              </div>
+            </a>
           </div>
 
-          <!-- ✅ AADHAR FRONT -->
-          <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Aadhar Front</div>
-            <img id="u-aadhar-front" class="clickable-img" src="${getImgSrc(u.aadhar_front_image)}" onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar+F'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          <!-- ✅ UPDATED: AADHAR FRONT -->
+          <div class="img-card">
+            <div class="img-card-label">AADHAR FRONT</div>
+            <a href="${getImgSrc(u.aadhar_front_image)}" target="_blank">
+              <div class="img-wrapper">
+                <img id="u-aadhar-front" src="${getImgSrc(u.aadhar_front_image)}" 
+                     onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar+Front'" />
+              </div>
+            </a>
           </div>
 
-          <!-- ✅ AADHAR BACK -->
-          <div style="text-align:center;">
-            <div style="font-size:14px; margin-bottom:5px;">Aadhar Back</div>
-            <img id="u-aadhar-back" class="clickable-img" src="${getImgSrc(u.aadhar_back_image)}" onclick="openModal(this.src)"
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar+B'; this.style.border='2px solid red'"
-                 style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5;" />
+          <!-- ✅ UPDATED: AADHAR BACK -->
+          <div class="img-card">
+            <div class="img-card-label">AADHAR BACK</div>
+            <a href="${getImgSrc(u.aadhar_back_image)}" target="_blank">
+              <div class="img-wrapper">
+                <img id="u-aadhar-back" src="${getImgSrc(u.aadhar_back_image)}" 
+                     onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar+Back'" />
+              </div>
+            </a>
           </div>
 
         </div>
       </div>
 
-      <div class="status">✔ Valid Entry Approved</div>
-      <div id="error-display" class="error-msg">❌ Invalid ID</div>
+      <!-- FOOTER -->
+      <div class="card-footer">
+        <span>System Status: <span style="color:#00c853">● Online</span></span>
+        <span class="status-msg" id="status-msg">Ready to Scan</span>
+      </div>
+
     </div>
-    <div class="card-footer">Scan QR / Barcode at Entry Gate</div>
   </div>
 
-  <!-- MODAL -->
-  <div id="imageModal" class="modal">
-    <span class="close-modal" onclick="closeModal()">&times;</span>
-    <img class="modal-content" id="modalImg">
-  </div>
-
+  <!-- LOGIC -->
   <script>
     const input = document.getElementById('scanInput');
-    const error = document.getElementById('error-display');
-    setInterval(() => { if (document.activeElement !== input) { input.focus(); } }, 100);
+    const statusMsg = document.getElementById('status-msg');
+    const dataPanel = document.querySelector('.data-panel');
+    const imagesPanel = document.querySelector('.images-panel');
 
-    function openModal(src) {
-        if(src.includes("placeholder")) return;
-        var modal = document.getElementById("imageModal");
-        var modalImg = document.getElementById("modalImg");
-        modal.style.display = "block";
-        modalImg.src = src;
-    }
-    function closeModal() {
-        document.getElementById("imageModal").style.display = "none";
-    }
-    window.onclick = function(event) {
-        var modal = document.getElementById("imageModal");
-        if (event.target == modal) { modal.style.display = "none"; }
-    }
+    // Force Focus Loop
+    setInterval(() => {
+      if (document.activeElement !== input) {
+        input.focus();
+      }
+    }, 100);
 
     input.addEventListener('keydown', async function (e) {
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
         const id = input.value.trim();
         input.value = '';
+        
         if (id) {
           window.history.pushState({ id: id }, "", "/user/" + id);
           await loadUserData(id);
@@ -825,17 +890,23 @@ app.get("/user/:id", async (req, res) => {
     });
 
     async function loadUserData(id) {
+      // Visual Feedback
+      statusMsg.innerText = "Scanning...";
+      statusMsg.style.color = "#e67e22";
+
       try {
         const res = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ barcode_id: id })
         });
+        
         const json = await res.json();
 
         if (json.success) {
           const u = json.data;
-          error.style.display = 'none';
+          
+          // Update Text Fields
           document.getElementById('u-full_name').innerText = u.full_name;
           document.getElementById('u-email').innerText = u.email;
           document.getElementById('u-phone').innerText = u.phone;
@@ -849,47 +920,56 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
 
-          const updateImage = (imgId, url, placeholder) => {
-              const img = document.getElementById(imgId);
-              if (url && url.length > 10) {
-                  img.src = url;
-                  img.style.border = "1px solid #ddd";
-                  img.onclick = function() { openModal(url); };
-              } else {
-                  img.src = placeholder;
-                  img.onclick = null;
-              }
+          // Safe Image Update
+          const updateImage = (id, url) => {
+            const img = document.getElementById(id);
+            const link = img.parentElement.parentElement;
+            if (url && url.length > 10) {
+                img.src = url;
+                link.href = url;
+                img.style.opacity = "1";
+            } else {
+                img.src = "https://via.placeholder.com/150?text=No+Image";
+                link.href = "#";
+                img.style.opacity = "0.5";
+            }
           };
 
-          updateImage('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
-          updateImage('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Pay");
-          updateImage('u-aadhar-front', u.aadhar_front_image, "https://via.placeholder.com/150?text=No+Aadhar+F");
-          updateImage('u-aadhar-back', u.aadhar_back_image, "https://via.placeholder.com/150?text=No+Aadhar+B");
+          updateImage('u-selfie', u.selfie_image);
+          updateImage('u-payment', u.payment_image);
+          // ✅ UPDATED MAPPING
+          updateImage('u-aadhar-front', u.aadhar_front_image);
+          updateImage('u-aadhar-back', u.aadhar_back_image);
 
-          document.querySelector('.status').innerText = "✅ Scan logged - Valid Entry Approved";
+          statusMsg.innerText = "✅ " + u.full_name + " - Entry Approved";
+          statusMsg.style.color = "#00c853";
+
+          // Subtle flash effect on success
+          document.querySelector('.card').animate([
+            { boxShadow: '0 0 0 0 rgba(0, 200, 83, 0.7)' },
+            { boxShadow: '0 0 0 20px rgba(0, 200, 83, 0)' }
+          ], { duration: 500 });
+
         } else {
-          error.style.display = 'block';
-          document.querySelector('.status').innerText = "❌ Invalid Barcode";
+          statusMsg.innerText = "❌ Invalid ID or User Not Found";
+          statusMsg.style.color = "#e74c3c";
         }
       } catch (err) {
-        console.error("❌ Frontend Error:", err);
-        error.style.display = 'block';
-        document.querySelector('.status').innerText = "❌ Scan Error";
+        console.error(err);
+        statusMsg.innerText = "❌ Connection Error";
+        statusMsg.style.color = "#e74c3c";
       }
     }
   </script>
+
 </body>
 </html>
     `);
+
   } catch (err) {
     console.error(err);
     res.send("Error loading user");
   }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on port " + PORT);
 });
 
 // ==============================
