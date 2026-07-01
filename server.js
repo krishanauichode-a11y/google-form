@@ -114,12 +114,32 @@ app.post("/create", async (req, res) => {
   try {
     const { fullName, address, email, phone, dob, date, tradingMarket, tradingType, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType } = req.body;
     const id = generateShortId(); 
-    await pool.query(`INSERT INTO users(id, full_name, address, email, phone, dob, date, trading_market, trading_type, source, software_used, amount, payment_mode, selfie_image, payment_image, aadhar_front_image, aadhar_back_image, course_type) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`, [id, fullName, address, email, phone, dob, date, tradingMarket, tradingType, null, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType]);
+    
+    // ✅ FIXED: Added $18 to match the 18 columns and 18 values
+    await pool.query(
+      `INSERT INTO users(
+        id, full_name, address, email, phone, dob, date, 
+        trading_market, trading_type, source, software_used, 
+        amount, payment_mode, selfie_image, payment_image, 
+        aadhar_front_image, aadhar_back_image, course_type
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`, 
+      [
+        id, fullName, address, email, phone, dob, date, 
+        tradingMarket, tradingType, null, softwareUsed, 
+        amount, paymentMode, selfieImage, paymentImage, 
+        aadharFrontImage, aadharBackImage, courseType
+      ]
+    );
+
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), await QRCode.toBuffer(`https://google-form-kebh.onrender.com/user/${id}`, { width: 600, margin: 2, errorCorrectionLevel: 'H' }));
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 }));
     await generateFinalImage(id);
+    
     res.json({ success: true, id });
-  } catch (err) { console.error("❌ CREATE ERROR:", err); res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error("❌ CREATE ERROR:", err); 
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 // ==============================
