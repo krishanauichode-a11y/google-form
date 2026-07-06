@@ -41,6 +41,76 @@ function generateShortId() {
 
 app.get("/", (req, res) => res.send("✅ Server Running"));
 
+// ==================================================================================
+// 🆕 PIPELINE TRACKING SYSTEM (PHP -> NODE -> GOOGLE FORMS)
+// ==================================================================================
+
+// ✅ 1. TRACKING LINK: Records "OPEN" & Redirects to Google Form
+app.get("/track", async (req, res) => {
+  try {
+    const { ref_id } = req.query;
+    if (!ref_id) return res.status(400).send("Missing reference ID");
+
+    // Update Pipeline: Form Opened
+    await pool.query(`
+      INSERT INTO client_pipeline (ref_id, status, form_opened_at)
+      VALUES ($1, 'FORM_OPENED', NOW())
+      ON CONFLICT (ref_id) 
+      DO UPDATE SET status = 'FORM_OPENED', form_opened_at = NOW()
+    `, [ref_id]);
+
+    // ⚠️ IMPORTANT: Replace 'entry.1234567890' with your actual Google Form hidden field ID
+    const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform?entry.1234567890=${ref_id}`;
+    
+    // Redirect user to Google Form
+    res.redirect(googleFormUrl);
+  } catch (err) {
+    console.error("Track Error:", err);
+    res.status(500).send("Tracking failed");
+  }
+});
+
+// ✅ 2. WEBHOOK: Receives Google Form Submit & Records "SUBMITTED"
+app.post("/webhook/google-form", async (req, res) => {
+  try {
+    const { ref_id } = req.body;
+    if (!ref_id) return res.status(400).json({ error: "Missing ref_id" });
+
+    // Insert into Form Responses Log (for your admin UI)
+    await pool.query(`
+      INSERT INTO google_form_responses (id, ref_id, raw_data, received_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (id) DO NOTHING
+    `, [generateShortId(), ref_id, JSON.stringify(req.body)]);
+
+    // Update Pipeline: Form Submitted
+    await pool.query(`
+      INSERT INTO client_pipeline (ref_id, status, form_submitted_at)
+      VALUES ($1, 'FORM_SUBMITTED', NOW())
+      ON CONFLICT (ref_id) 
+      DO UPDATE SET status = 'FORM_SUBMITTED', form_submitted_at = NOW()
+    `, [ref_id]);
+
+    res.status(200).json({ success: true, message: "Pipeline updated to FORM_SUBMITTED" });
+  } catch (err) {
+    console.error("Webhook Error:", err);
+    res.status(500).json({ error: "Webhook failed" });
+  }
+});
+
+// ✅ 3. PIPELINE STATUS API (To check from Admin UI if needed)
+app.get("/api/pipeline/:ref_id", async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM client_pipeline WHERE ref_id = $1`, [req.params.ref_id]);
+    res.json({ success: result.rows.length > 0, data: result.rows[0] || null });
+  } catch (err) { res.json({ success: false }); }
+});
+
+
+// ==================================================================================
+// ORIGINAL APIS
+// ==================================================================================
+
 // ==============================
 // 🆕 CHECK FORM STATUS API
 // ==============================
@@ -302,6 +372,16 @@ async function initializeDatabase() {
     await client.query(`CREATE TABLE IF NOT EXISTS users (id VARCHAR(7) PRIMARY KEY, full_name VARCHAR(255), address TEXT, email VARCHAR(255), phone VARCHAR(20), dob DATE, date TIMESTAMP, trading_market VARCHAR(100), trading_type VARCHAR(100), source VARCHAR(100), software_used VARCHAR(100), amount NUMERIC, payment_mode VARCHAR(50), selfie_image TEXT, payment_image TEXT, aadhar_front_image TEXT, aadhar_back_image TEXT, course_type VARCHAR(100));`);
     await client.query(`CREATE TABLE IF NOT EXISTS scans (id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255) NOT NULL, scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT);`);
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`);
+    
+    // ✅ ADDED: Pipeline Table Creation
+    await client.query(`CREATE TABLE IF NOT EXISTS client_pipeline (
+      ref_id VARCHAR(50) PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      form_opened_at TIMESTAMP WITH TIME ZONE,
+      form_submitted_at TIMESTAMP WITH TIME ZONE,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`);
+
   } catch (err) { console.error("DB Init Error:", err); } finally { client.release(); }
 }
 initializeDatabase().catch(console.error);
