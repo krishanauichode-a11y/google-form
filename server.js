@@ -45,18 +45,18 @@ app.get("/", (req, res) => res.send("✅ Server Running"));
 // 🆕 PIPELINE TRACKING SYSTEM (PHP -> NODE -> GOOGLE FORMS)
 // ==================================================================================
 
-// ✅ 1. TRACKING LINK: Records "OPEN" & Redirects to Google Form
+// ✅ 1. TRACKING LINK: Records STEP 4 (Form Opened) & Redirects
 app.get("/track", async (req, res) => {
   try {
     const { ref_id } = req.query;
     if (!ref_id) return res.status(400).send("Missing reference ID");
 
-    // Update Pipeline: Form Opened
+    // Update Pipeline: Step 4 Opened
     await pool.query(`
-      INSERT INTO client_pipeline (ref_id, status, form_opened_at)
-      VALUES ($1, 'FORM_OPENED', NOW())
+      INSERT INTO client_pipeline (ref_id, step_4_form_opened_at)
+      VALUES ($1, NOW())
       ON CONFLICT (ref_id) 
-      DO UPDATE SET status = 'FORM_OPENED', form_opened_at = NOW()
+      DO UPDATE SET step_4_form_opened_at = NOW()
     `, [ref_id]);
 
     // ⚠️ IMPORTANT: Replace 'entry.1234567890' with your actual Google Form hidden field ID
@@ -70,7 +70,7 @@ app.get("/track", async (req, res) => {
   }
 });
 
-// ✅ 2. WEBHOOK: Receives Google Form Submit & Records "SUBMITTED"
+// ✅ 2. WEBHOOK: Receives Google Form Submit & Records STEP 5
 app.post("/webhook/google-form", async (req, res) => {
   try {
     const { ref_id } = req.body;
@@ -83,12 +83,12 @@ app.post("/webhook/google-form", async (req, res) => {
       ON CONFLICT (id) DO NOTHING
     `, [generateShortId(), ref_id, JSON.stringify(req.body)]);
 
-    // Update Pipeline: Form Submitted
+    // Update Pipeline: Step 5 Submitted
     await pool.query(`
-      INSERT INTO client_pipeline (ref_id, status, form_submitted_at)
-      VALUES ($1, 'FORM_SUBMITTED', NOW())
+      INSERT INTO client_pipeline (ref_id, step_5_form_submitted_at)
+      VALUES ($1, NOW())
       ON CONFLICT (ref_id) 
-      DO UPDATE SET status = 'FORM_SUBMITTED', form_submitted_at = NOW()
+      DO UPDATE SET step_5_form_submitted_at = NOW()
     `, [ref_id]);
 
     res.status(200).json({ success: true, message: "Pipeline updated to FORM_SUBMITTED" });
@@ -274,7 +274,6 @@ input#scanInput::placeholder{color:rgba(255,255,255,0.7)}
 .card-footer{text-align:center;padding:20px;font-size:14px;color:#777;border-top:1px solid #eee}
 .status{text-align:center;margin-top:20px;font-size:16px;color:#00c853;font-weight:600;padding:12px;border-radius:8px;background:rgba(0,200,83,0.1)}
 .error-msg{color:#ff4444;font-size:16px;font-weight:600;display:none;margin-top:20px;padding:12px;border-radius:8px;background:rgba(255,68,68,0.1)}
-/* NEW FORM STATUS */
 .form-status-box{margin-top:20px;padding:16px;border-radius:10px;text-align:center;font-size:14px}
 .form-filled{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
 .form-pending{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
@@ -365,7 +364,7 @@ async function loadUserData(id) {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
-// DB INIT (Added google_form_responses table)
+// DB INIT
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
@@ -373,15 +372,20 @@ async function initializeDatabase() {
     await client.query(`CREATE TABLE IF NOT EXISTS scans (id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255) NOT NULL, scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT);`);
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`);
     
-    // ✅ ADDED: Pipeline Table Creation
-    await client.query(`CREATE TABLE IF NOT EXISTS client_pipeline (
-      ref_id VARCHAR(50) PRIMARY KEY,
-      status TEXT NOT NULL DEFAULT 'PENDING',
-      form_opened_at TIMESTAMP WITH TIME ZONE,
-      form_submitted_at TIMESTAMP WITH TIME ZONE,
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );`);
+    // ✅ ADDED: Step-by-Step Pipeline Table Creation
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS client_pipeline (
+        ref_id VARCHAR(50) PRIMARY KEY,
+        step_1_paid_at TIMESTAMPTZ,
+        step_2_full_paid_at TIMESTAMPTZ,
+        step_3_comms_sent_at TIMESTAMPTZ,
+        step_4_form_opened_at TIMESTAMPTZ,
+        step_5_form_submitted_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
 
+    console.log("✅ Database tables verified/created.");
   } catch (err) { console.error("DB Init Error:", err); } finally { client.release(); }
 }
 initializeDatabase().catch(console.error);
