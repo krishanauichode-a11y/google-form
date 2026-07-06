@@ -19,10 +19,10 @@ app.use(cors());
 app.use(session({ secret: "super-secret-key", resave: false, saveUninitialized: true }));
 
 const pool = new Pool({
-  user: "postgres.ufbttlxvzuchacptqkee",
-  host: "aws-1-ap-south-1.pooler.supabase.com",
+  user: "postgres.swknmxqcgoobxxjmrspz",
+  host: "aws-1-ap-southeast-2.pooler.supabase.com",
   database: "postgres",
-  password: "1lqW1fYbCxK4jgr9",
+  password: "xpevVM-*Au%Vd9c",
   port: 5432,
   ssl: { rejectUnauthorized: false }
 });
