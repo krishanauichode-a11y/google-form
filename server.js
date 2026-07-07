@@ -42,14 +42,13 @@ function generateShortId() {
 app.get("/", (req, res) => res.send("✅ Server Running"));
 
 // ==================================================================================
-// 🆕 DEBUG TRACKING LINK (Shows exact error on screen)
+// 🆕 DEBUG TRACKING LINK (Step 4: Marks form as opened, redirects to Google Form)
 // ==================================================================================
 app.get("/track", async (req, res) => {
   try {
     const { ref_id } = req.query;
     if (!ref_id) return res.status(400).send("Missing reference ID");
 
-    // Step 4: Mark form as opened in pipeline
     await pool.query(`
       INSERT INTO client_pipeline (ref_id, step_4_form_opened_at)
       VALUES ($1, NOW())
@@ -57,13 +56,10 @@ app.get("/track", async (req, res) => {
       DO UPDATE SET step_4_form_opened_at = NOW()
     `, [ref_id]);
 
-    // ⚠️ IMPORTANT: Replace '1234567890' with your REAL Google Form entry ID
-    // See instructions on how to find this in the previous message
-    const REAL_ENTRY_ID = "1234567890"; 
+    // Redirect straight to the Google Form (No pre-filled Reference ID needed anymore!)
+    const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform`;
     
-    const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform?entry.${REAL_ENTRY_ID}=${ref_id}`;
-    
-    console.log(`🔄 Redirecting ${ref_id} to Google Form`);
+    console.log(`🔄 Step 4 triggered for ${ref_id}. Redirecting to form.`);
     return res.redirect(googleFormUrl);
     
   } catch (err) {
@@ -78,21 +74,19 @@ app.get("/track", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ WEBHOOK FOR GOOGLE FORMS (Called by Google Apps Script on form submit)
+// ✅ WEBHOOK FOR GOOGLE FORMS (Step 5: Marks form as submitted)
 // ==================================================================================
 app.post("/webhook/google-form", async (req, res) => {
   try {
     const { ref_id } = req.body;
     if (!ref_id) return res.status(400).json({ error: "Missing ref_id" });
     
-    // Save to google_form_responses table
     await pool.query(`
       INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) 
       VALUES ($1, $2, $3, NOW()) 
       ON CONFLICT (id) DO NOTHING
     `, [generateShortId(), ref_id, JSON.stringify(req.body)]);
     
-    // Step 5: Mark form as submitted in pipeline
     await pool.query(`
       INSERT INTO client_pipeline (ref_id, step_5_form_submitted_at) 
       VALUES ($1, NOW()) 
@@ -109,7 +103,37 @@ app.post("/webhook/google-form", async (req, res) => {
 });
 
 // ==================================================================================
-// API ROUTES
+// 🆕 AUTO-MATCH REF_ID BY PHONE NUMBER (For Step 5 without Reference ID field)
+// ==================================================================================
+app.post("/api/find-ref-by-phone", async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: "Missing phone" });
+    
+    // Clean phone number (keep last 10 digits)
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+    
+    // Search the 'customers' table for a matching paid phone number
+    const r = await pool.query(
+      `SELECT ref_id FROM customers WHERE mobile LIKE '%' || $1 || '%' AND payment_status = 'paid' ORDER BY paid_at DESC LIMIT 1`,
+      [cleanPhone]
+    );
+    
+    if (r.rows.length > 0) {
+      console.log(`✅ Found ref_id ${r.rows[0].ref_id} for phone ${cleanPhone}`);
+      res.json({ success: true, ref_id: r.rows[0].ref_id });
+    } else {
+      console.log(`❌ No payment found for phone ${cleanPhone}`);
+      res.json({ success: false, error: "No matching payment found" });
+    }
+  } catch (err) {
+    console.error("Find Phone Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================================================================================
+// OTHER API ROUTES
 // ==================================================================================
 app.get("/api/pipeline/:ref_id", async (req, res) => {
   try { 
@@ -253,7 +277,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
 // ==================================================================================
-// DB INIT (SCHEMA EXACTLY MATCHES PHP FILE)
+// DB INIT (SAFE SCHEMA UPDATE - PRESERVES DATA & FIXES RLS)
 // ==================================================================================
 async function initializeDatabase() {
   const client = await pool.connect();
@@ -263,21 +287,41 @@ async function initializeDatabase() {
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`);
     
     console.log("🔄 Checking pipeline table schema...");
-    await client.query(`DROP TABLE IF EXISTS client_pipeline`);
     
-    // ✅ FIXED SCHEMA: Names now perfectly match the PHP pipeline file
-    await client.query(`
-      CREATE TABLE client_pipeline (
-        ref_id VARCHAR(50) PRIMARY KEY,
-        step_1_booking_paid_at TIMESTAMPTZ,
-        step_2_full_paid_at TIMESTAMPTZ,
-        step_3_comms_sent_at TIMESTAMPTZ,
-        step_4_form_opened_at TIMESTAMPTZ,
-        step_5_form_submitted_at TIMESTAMPTZ,
-        updated_at TIMESTAMPTZ DEFAULT NOW()
+    // CHECK IF TABLE EXISTS INSTEAD OF DELETING IT
+    const tableExists = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'client_pipeline'
       );
     `);
-    console.log("✅ Pipeline table recreated successfully.");
+
+    if (!tableExists.rows[0].exists) {
+      // Create table only if it doesn't exist
+      await client.query(`
+        CREATE TABLE client_pipeline (
+          ref_id VARCHAR(50) PRIMARY KEY,
+          step_1_booking_paid_at TIMESTAMPTZ,
+          step_2_full_paid_at TIMESTAMPTZ,
+          step_3_comms_sent_at TIMESTAMPTZ,
+          step_4_form_opened_at TIMESTAMPTZ,
+          step_5_form_submitted_at TIMESTAMPTZ,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+      console.log("✅ Pipeline table created.");
+    } else {
+      console.log("✅ Pipeline table exists (data preserved).");
+    }
+
+    // CRITICAL FIX: Disable RLS so PHP can read the data via REST API
+    try {
+      await client.query(`ALTER TABLE client_pipeline DISABLE ROW LEVEL SECURITY;`);
+      console.log("✅ RLS Disabled on client_pipeline.");
+    } catch (err) {
+      console.log("ℹ️ RLS already disabled.");
+    }
 
   } catch (err) { console.error("DB Init Error:", err); } finally { client.release(); }
 }
