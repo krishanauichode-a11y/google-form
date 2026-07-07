@@ -18,6 +18,9 @@ app.use(cors());
 
 app.use(session({ secret: "super-secret-key", resave: false, saveUninitialized: true }));
 
+// ==================================================================================
+// 🌐 NODE.JS DATABASE (For Users, Scans, Passes)
+// ==================================================================================
 const pool = new Pool({
   user: "postgres.swknmxqcgoobxxjmrspz",
   host: "aws-1-ap-southeast-2.pooler.supabase.com",
@@ -26,6 +29,13 @@ const pool = new Pool({
   port: 5432,
   ssl: { rejectUnauthorized: false }
 });
+
+// ==================================================================================
+// ⚠️ PHP SUPABASE API CREDENTIALS (PASTE YOUR PHP CONFIG.PHP VALUES HERE)
+// ==================================================================================
+const PHP_SUPABASE_URL = "https://uqejdqtwxpvgpolybtkg.supabase.co"; // e.g., https://abc123xyz.supabase.co
+const PHP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxZWpkcXR3eHB2Z3BvbHlidGtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTI2ODEsImV4cCI6MjA5Nzc2ODY4MX0.7kHKkN6DmC1-6wNI8l5Pee-b78N-o7zqBHEKiiCKGX0"; // e.g., eyJhbGciOiJIUzI1NiIs...
+
 
 const tempDir = path.join(os.tmpdir(), "temp_passes");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
@@ -42,59 +52,65 @@ function generateShortId() {
 app.get("/", (req, res) => res.send("✅ Server Running"));
 
 // ==================================================================================
-// 🆕 DEBUG TRACKING LINK (Step 4: Marks form as opened, redirects to Google Form)
+// 🆕 STEP 4: TRACKING LINK (Saves to PHP Database via API)
 // ==================================================================================
 app.get("/track", async (req, res) => {
   try {
     const { ref_id } = req.query;
     if (!ref_id) return res.status(400).send("Missing reference ID");
 
-    await pool.query(`
-      INSERT INTO client_pipeline (ref_id, step_4_form_opened_at)
-      VALUES ($1, NOW())
-      ON CONFLICT (ref_id) 
-      DO UPDATE SET step_4_form_opened_at = NOW()
-    `, [ref_id]);
+    // ✅ CALLING PHP SUPABASE REST API TO UPDATE STEP 4
+    await fetch(PHP_SUPABASE_URL + '/rest/v1/client_pipeline', {
+      method: 'POST',
+      headers: {
+        'apikey': PHP_SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${PHP_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates' // This acts like ON CONFLICT UPDATE
+      },
+      body: JSON.stringify({
+        ref_id: ref_id,
+        step_4_form_opened_at: new Date().toISOString()
+      })
+    });
 
-    // Redirect straight to the Google Form (No pre-filled Reference ID needed anymore!)
     const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform`;
-    
-    console.log(`🔄 Step 4 triggered for ${ref_id}. Redirecting to form.`);
+    console.log(`🔄 Step 4 saved to PHP DB via API for ${ref_id}`);
     return res.redirect(googleFormUrl);
     
   } catch (err) {
     console.error("❌ TRACK ERROR:", err);
-    res.status(500).send(`
-      <h2 style="color:red; text-align:center; margin-top:50px;">Debug Error</h2>
-      <p style="text-align:center; font-family:monospace; background:#f3f4f6; padding:20px; max-width:600px; margin:20px auto; border-radius:8px;">
-        <strong>Error Message:</strong><br>${err.message}
-      </p>
-    `);
+    res.status(500).send(`<h2 style="color:red; text-align:center; margin-top:50px;">Debug Error</h2><p style="text-align:center; font-family:monospace; background:#f3f4f6; padding:20px; max-width:600px; margin:20px auto; border-radius:8px;"><strong>Error Message:</strong><br>${err.message}</p>`);
   }
 });
 
 // ==================================================================================
-// ✅ WEBHOOK FOR GOOGLE FORMS (Step 5: Marks form as submitted)
+// ✅ STEP 5: WEBHOOK (Saves to PHP Database via API)
 // ==================================================================================
 app.post("/webhook/google-form", async (req, res) => {
   try {
     const { ref_id } = req.body;
     if (!ref_id) return res.status(400).json({ error: "Missing ref_id" });
     
-    await pool.query(`
-      INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) 
-      VALUES ($1, $2, $3, NOW()) 
-      ON CONFLICT (id) DO NOTHING
-    `, [generateShortId(), ref_id, JSON.stringify(req.body)]);
+    // Save response logs in Node DB
+    await pool.query(`INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) VALUES ($1, $2, $3, NOW()) ON CONFLICT (id) DO NOTHING`, [generateShortId(), ref_id, JSON.stringify(req.body)]);
     
-    await pool.query(`
-      INSERT INTO client_pipeline (ref_id, step_5_form_submitted_at) 
-      VALUES ($1, NOW()) 
-      ON CONFLICT (ref_id) 
-      DO UPDATE SET step_5_form_submitted_at = NOW()
-    `, [ref_id]);
+    // ✅ CALLING PHP SUPABASE REST API TO UPDATE STEP 5
+    await fetch(PHP_SUPABASE_URL + '/rest/v1/client_pipeline', {
+      method: 'POST',
+      headers: {
+        'apikey': PHP_SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${PHP_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        ref_id: ref_id,
+        step_5_form_submitted_at: new Date().toISOString()
+      })
+    });
     
-    console.log(`✅ Step 5 completed for ref_id: ${ref_id}`);
+    console.log(`✅ Step 5 saved to PHP DB via API for ref_id: ${ref_id}`);
     res.status(200).json({ success: true });
   } catch (err) { 
     console.error("❌ WEBHOOK ERROR:", err);
@@ -103,25 +119,28 @@ app.post("/webhook/google-form", async (req, res) => {
 });
 
 // ==================================================================================
-// 🆕 AUTO-MATCH REF_ID BY PHONE NUMBER (For Step 5 without Reference ID field)
+// 🔍 FIND REF_ID BY PHONE (Reads from PHP Database via API)
 // ==================================================================================
 app.post("/api/find-ref-by-phone", async (req, res) => {
   try {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: "Missing phone" });
     
-    // Clean phone number (keep last 10 digits)
     const cleanPhone = phone.replace(/\D/g, "").slice(-10);
     
-    // Search the 'customers' table for a matching paid phone number
-    const r = await pool.query(
-      `SELECT ref_id FROM customers WHERE mobile LIKE '%' || $1 || '%' AND payment_status = 'paid' ORDER BY paid_at DESC LIMIT 1`,
-      [cleanPhone]
-    );
+    // ✅ CALLING PHP SUPABASE REST API TO SEARCH CUSTOMERS TABLE
+    const response = await fetch(`${PHP_SUPABASE_URL}/rest/v1/customers?select=ref_id&mobile=ilike.%25${cleanPhone}%25&payment_status=eq.paid&order=paid_at.desc&limit=1`, {
+      headers: {
+        'apikey': PHP_SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${PHP_SUPABASE_ANON_KEY}`
+      }
+    });
     
-    if (r.rows.length > 0) {
-      console.log(`✅ Found ref_id ${r.rows[0].ref_id} for phone ${cleanPhone}`);
-      res.json({ success: true, ref_id: r.rows[0].ref_id });
+    const data = await response.json();
+    
+    if (data.length > 0) {
+      console.log(`✅ Found ref_id ${data[0].ref_id} for phone ${cleanPhone}`);
+      res.json({ success: true, ref_id: data[0].ref_id });
     } else {
       console.log(`❌ No payment found for phone ${cleanPhone}`);
       res.json({ success: false, error: "No matching payment found" });
@@ -174,45 +193,16 @@ app.post("/api/scan", async (req, res) => {
 // ==================================================================================
 async function generateFinalImage(id) {
   try {
-    const qrPath=path.join(tempDir,`${id}-qr.png`);
-    const barPath=path.join(tempDir,`${id}-barcode.png`);
-    const logoPath=path.join(__dirname,'logo.png');
+    const qrPath=path.join(tempDir,`${id}-qr.png`);const barPath=path.join(tempDir,`${id}-barcode.png`);const logoPath=path.join(__dirname,'logo.png');
     if(!fs.existsSync(qrPath)||!fs.existsSync(barPath)) throw new Error("Missing files");
-    const qrImage=await loadImage(qrPath);
-    const barcodeImg=await loadImage(barPath);
-    let logo;
-    if(fs.existsSync(logoPath)) logo=await loadImage(logoPath);
-    
-    const scale=2;
-    const canvas=createCanvas(700*scale,900*scale);
-    const ctx=canvas.getContext("2d");
-    ctx.scale(scale,scale);
-    ctx.imageSmoothingEnabled=true;
-    ctx.imageSmoothingQuality="high";
-    
-    ctx.fillStyle="#fff";ctx.fillRect(0,0,700,900);
-    const p="#003366";ctx.lineWidth=20;ctx.strokeStyle=p;ctx.strokeRect(10,10,680,880);
-    const cX=350;let cY=40;
-    
-    if(logo){
-      const sf=Math.min(500/logo.width,300/logo.height);
-      const dw=logo.width*sf;const dh=logo.height*sf;
-      ctx.drawImage(logo,cX-(dw/2),cY,dw,dh);cY+=dh+15;
-    }
-    ctx.textAlign="center";ctx.fillStyle=p;ctx.font="bold 20px Arial";ctx.fillText("www.tusharbhumkar.com",cX,cY);cY+=30;
-    ctx.beginPath();ctx.moveTo(50,cY);ctx.lineTo(650,cY);ctx.lineWidth=2;ctx.strokeStyle="#e0e0e0";ctx.stroke();cY+=70;
-    ctx.fillStyle=p;ctx.font="bold 50px Arial";ctx.fillText("ENTRY PASS",cX,cY);cY+=50;
-    
-    const qs=320;ctx.drawImage(qrImage,cX-(qs/2),cY,qs,qs);
-    const bY=cY+qs+25;ctx.drawImage(barcodeImg,50,bY,600,100);
-    ctx.fillStyle="#000";ctx.font="italic 20px Arial";ctx.fillText("Scan QR or Barcode at Entry",cX,bY+130);
-    
-    const fp=path.join(tempDir,`${id}-final.png`);
-    fs.writeFileSync(fp,canvas.toBuffer("image/png",{compressionLevel:9}));
-    return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
-  } catch(e){
-    console.error("IMG ERR",e);throw e;
-  }
+    const qrImage=await loadImage(qrPath);const barcodeImg=await loadImage(barPath);let logo;if(fs.existsSync(logoPath)) logo=await loadImage(logoPath);
+    const scale=2;const canvas=createCanvas(700*scale,900*scale);const ctx=canvas.getContext("2d");ctx.scale(scale,scale);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    ctx.fillStyle="#fff";ctx.fillRect(0,0,700,900);const p="#003366";ctx.lineWidth=20;ctx.strokeStyle=p;ctx.strokeRect(10,10,680,880);const cX=350;let cY=40;
+    if(logo){const sf=Math.min(500/logo.width,300/logo.height);const dw=logo.width*sf;const dh=logo.height*sf;ctx.drawImage(logo,cX-(dw/2),cY,dw,dh);cY+=dh+15;}
+    ctx.textAlign="center";ctx.fillStyle=p;ctx.font="bold 20px Arial";ctx.fillText("www.tusharbhumkar.com",cX,cY);cY+=30;ctx.beginPath();ctx.moveTo(50,cY);ctx.lineTo(650,cY);ctx.lineWidth=2;ctx.strokeStyle="#e0e0e0";ctx.stroke();cY+=70;ctx.fillStyle=p;ctx.font="bold 50px Arial";ctx.fillText("ENTRY PASS",cX,cY);cY+=50;
+    const qs=320;ctx.drawImage(qrImage,cX-(qs/2),cY,qs,qs);const bY=cY+qs+25;ctx.drawImage(barcodeImg,50,bY,600,100);ctx.fillStyle="#000";ctx.font="italic 20px Arial";ctx.fillText("Scan QR or Barcode at Entry",cX,bY+130);
+    const fp=path.join(tempDir,`${id}-final.png`);fs.writeFileSync(fp,canvas.toBuffer("image/png",{compressionLevel:9}));return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
+  } catch(e){console.error("IMG ERR",e);throw e;}
 }
 
 // ==================================================================================
@@ -256,9 +246,7 @@ app.post("/share-interakt", async (req, res) => {
 // ==================================================================================
 function checkAdmin(req, res) { 
   if(req.session.isAdmin) return true; 
-  if(req.query.p===process.env.ADMIN_PASS){
-    req.session.isAdmin=true;return true;
-  } 
+  if(req.query.p===process.env.ADMIN_PASS){req.session.isAdmin=true;return true;} 
   res.send(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><form method="GET" style="text-align:center;"><h2>🔒 Admin Access</h2><input type="password" name="p" placeholder="Enter Password" required style="padding:10px"/><br><br><button type="submit" style="padding:10px 20px">Access</button></form></body></html>`); 
   return false; 
 }
@@ -277,7 +265,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
 // ==================================================================================
-// DB INIT (SAFE SCHEMA UPDATE - PRESERVES DATA & FIXES RLS)
+// DB INIT (ONLY INITIALIZES NODE.JS DB TABLES NOW)
 // ==================================================================================
 async function initializeDatabase() {
   const client = await pool.connect();
@@ -285,44 +273,7 @@ async function initializeDatabase() {
     await client.query(`CREATE TABLE IF NOT EXISTS users (id VARCHAR(7) PRIMARY KEY, full_name VARCHAR(255), address TEXT, email VARCHAR(255), phone VARCHAR(20), dob DATE, date TIMESTAMP, trading_market VARCHAR(100), trading_type VARCHAR(100), source VARCHAR(100), software_used VARCHAR(100), amount NUMERIC, payment_mode VARCHAR(50), selfie_image TEXT, payment_image TEXT, aadhar_front_image TEXT, aadhar_back_image TEXT, course_type VARCHAR(100));`);
     await client.query(`CREATE TABLE IF NOT EXISTS scans (id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255) NOT NULL, scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT);`);
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`);
-    
-    console.log("🔄 Checking pipeline table schema...");
-    
-    // CHECK IF TABLE EXISTS INSTEAD OF DELETING IT
-    const tableExists = await client.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'client_pipeline'
-      );
-    `);
-
-    if (!tableExists.rows[0].exists) {
-      // Create table only if it doesn't exist
-      await client.query(`
-        CREATE TABLE client_pipeline (
-          ref_id VARCHAR(50) PRIMARY KEY,
-          step_1_booking_paid_at TIMESTAMPTZ,
-          step_2_full_paid_at TIMESTAMPTZ,
-          step_3_comms_sent_at TIMESTAMPTZ,
-          step_4_form_opened_at TIMESTAMPTZ,
-          step_5_form_submitted_at TIMESTAMPTZ,
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-      `);
-      console.log("✅ Pipeline table created.");
-    } else {
-      console.log("✅ Pipeline table exists (data preserved).");
-    }
-
-    // CRITICAL FIX: Disable RLS so PHP can read the data via REST API
-    try {
-      await client.query(`ALTER TABLE client_pipeline DISABLE ROW LEVEL SECURITY;`);
-      console.log("✅ RLS Disabled on client_pipeline.");
-    } catch (err) {
-      console.log("ℹ️ RLS already disabled.");
-    }
-
+    console.log("✅ Node.js DB tables ready.");
   } catch (err) { console.error("DB Init Error:", err); } finally { client.release(); }
 }
 initializeDatabase().catch(console.error);
