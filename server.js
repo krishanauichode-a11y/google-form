@@ -44,7 +44,6 @@ app.get("/", (req, res) => res.send("✅ Server Running"));
 // ==================================================================================
 // 🆕 DEBUG TRACKING LINK (Shows exact error on screen)
 // ==================================================================================
-// ✅ 1. TRACKING LINK: Records STEP 4 (Form Opened)
 app.get("/track", async (req, res) => {
   try {
     const { ref_id } = req.query;
@@ -59,28 +58,28 @@ app.get("/track", async (req, res) => {
 
     const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform?entry.1234567890=${ref_id}`;
     return res.redirect(googleFormUrl);
+    
   } catch (err) {
-    console.error("Track Error:", err);
-    res.status(500).send("Tracking failed");
+    console.error("❌ TRACK ERROR:", err);
+    // 👇 THIS WILL SHOW THE EXACT ERROR ON YOUR SCREEN INSTEAD OF "TRACKING FAILED"
+    res.status(500).send(`
+      <h2 style="color:red; text-align:center; margin-top:50px;">Debug Error</h2>
+      <p style="text-align:center; font-family:monospace; background:#f3f4f6; padding:20px; max-width:600px; margin:20px auto; border-radius:8px;">
+        <strong>Error Message:</strong><br>${err.message}
+      </p>
+    `);
   }
 });
 
-// ✅ 2. WEBHOOK: Records STEP 5 (Form Submitted)
+// ✅ 2. WEBHOOK
 app.post("/webhook/google-form", async (req, res) => {
   try {
     const { ref_id } = req.body;
     if (!ref_id) return res.status(400).json({ error: "Missing ref_id" });
     await pool.query(`INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) VALUES ($1, $2, $3, NOW()) ON CONFLICT (id) DO NOTHING`, [generateShortId(), ref_id, JSON.stringify(req.body)]);
-    
-    await pool.query(`
-      INSERT INTO client_pipeline (ref_id, step_5_form_submitted_at)
-      VALUES ($1, NOW())
-      ON CONFLICT (ref_id) 
-      DO UPDATE SET step_5_form_submitted_at = NOW()
-    `, [ref_id]);
-
+    await pool.query(`INSERT INTO client_pipeline (ref_id, step_5_form_submitted_at) VALUES ($1, NOW()) ON CONFLICT (ref_id) DO UPDATE SET step_5_form_submitted_at = NOW()`, [ref_id]);
     res.status(200).json({ success: true });
-  } catch (err) { res.status(500).json({ error: "Webhook failed" }); }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get("/api/pipeline/:ref_id", async (req, res) => {
@@ -127,21 +126,21 @@ async function initializeDatabase() {
     await client.query(`CREATE TABLE IF NOT EXISTS scans (id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255) NOT NULL, scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT);`);
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`);
     
-       // ✅ 5-STEP PIPELINE
+    // ✅ FORCE DROP OLD TABLE AND RECREATE WITH NEW SCHEMA
     console.log("🔄 Checking pipeline table schema...");
     await client.query(`DROP TABLE IF EXISTS client_pipeline`);
     await client.query(`
       CREATE TABLE client_pipeline (
         ref_id VARCHAR(50) PRIMARY KEY,
-        step_1_booking_paid_at TIMESTAMPTZ,
+        step_1_paid_at TIMESTAMPTZ,
         step_2_full_paid_at TIMESTAMPTZ,
         step_3_comms_sent_at TIMESTAMPTZ,
         step_4_form_opened_at TIMESTAMPTZ,
-        step_5_form_submitted_at TIMESTAMSTZ,
+        step_5_form_submitted_at TIMESTAMPTZ,
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    console.log("✅ 5-Step Pipeline table recreated.");
+    console.log("✅ Pipeline table recreated successfully.");
 
   } catch (err) { console.error("DB Init Error:", err); } finally { client.release(); }
 }
