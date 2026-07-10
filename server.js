@@ -270,7 +270,27 @@ app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    await client.query(`CREATE TABLE IF NOT EXISTS users (id VARCHAR(7) PRIMARY KEY, full_name VARCHAR(255), address TEXT, email VARCHAR(255), phone VARCHAR(20), dob DATE, date TIMESTAMP, trading_market VARCHAR(100), trading_type VARCHAR(100), source VARCHAR(100), software_used VARCHAR(100), amount NUMERIC, payment_mode VARCHAR(50), selfie_image TEXT, payment_image TEXT, aadhar_front_image TEXT, aadhar_back_image TEXT, course_type VARCHAR(100));`);
+    await client.query(`CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(7) PRIMARY KEY, 
+      full_name VARCHAR(255), 
+      address TEXT, 
+      email VARCHAR(255), 
+      phone VARCHAR(20), 
+      dob DATE, 
+      date TIMESTAMP, 
+      trading_market VARCHAR(100), 
+      trading_type VARCHAR(100), 
+      source VARCHAR(100), 
+      software_used VARCHAR(100), 
+      amount NUMERIC, 
+      payment_mode VARCHAR(50), 
+      selfie_image TEXT, 
+      payment_image TEXT, 
+      aadhar_back_image TEXT, 
+      aadhar_front_image TEXT, 
+      course_type VARCHAR(100),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`);
     await client.query(`CREATE TABLE IF NOT EXISTS scans (id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255) NOT NULL, scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT);`);
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`);
     console.log("✅ Node.js DB tables ready.");
