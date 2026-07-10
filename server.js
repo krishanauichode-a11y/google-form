@@ -83,19 +83,14 @@ app.get("/track", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ STEP 5: WEBHOOK (Saves to PHP Database via API) — IST time stored
+// ✅ STEP 5: WEBHOOK (Saves to PHP Database via API)
 // ==================================================================================
 app.post("/webhook/google-form", async (req, res) => {
   try {
     const { ref_id } = req.body;
     if (!ref_id) return res.status(400).json({ error: "Missing ref_id" });
     
-    await pool.query(
-      `INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) 
-       VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Asia/Kolkata') 
-       ON CONFLICT (id) DO NOTHING`, 
-      [generateShortId(), ref_id, JSON.stringify(req.body)]
-    );
+    await pool.query(`INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) VALUES ($1, $2, $3, NOW()) ON CONFLICT (id) DO NOTHING`, [generateShortId(), ref_id, JSON.stringify(req.body)]);
     
     await fetch(PHP_SUPABASE_URL + '/rest/v1/client_pipeline', {
       method: 'POST',
@@ -161,14 +156,9 @@ app.get("/api/pipeline/:ref_id", async (req, res) => {
   } catch (e) { res.json({ success: false }); }
 });
 
-// ✅ FIXED: Reads received_at in Asia/Kolkata timezone
 app.get("/api/form-responses/:ref_id", async (req, res) => {
   try { 
-    const r = await pool.query(
-      `SELECT TO_CHAR(received_at AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY, HH12:MI AM') as received_at_formatted 
-       FROM google_form_responses WHERE ref_id = $1 LIMIT 1`, 
-      [req.params.ref_id]
-    ); 
+    const r = await pool.query(`SELECT TO_CHAR(received_at, 'DD Mon YYYY, HH12:MI AM') as received_at_formatted FROM google_form_responses WHERE ref_id = $1 LIMIT 1`, [req.params.ref_id]); 
     res.json({ success: r.rows.length > 0, data: r.rows[0] || null }); 
   } catch (e) { res.json({ success: false }); }
 });
@@ -181,7 +171,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ FIXED: SCAN ENDPOINT — All times stored in Asia/Kolkata
+// ✅ FIXED: SCAN ENDPOINT - Now properly stores in scans table and updates date
 // ==================================================================================
 app.post("/api/scan", async (req, res) => { 
   try { 
@@ -203,21 +193,20 @@ app.post("/api/scan", async (req, res) => {
     const u = ur.rows[0]; 
     console.log("✅ User found:", u.full_name, "| Course:", u.course_type);
     
-    // ✅ FIX 1: Update scanning date in users table — stored as formatted IST string
+    // ✅ FIX 1: Update scanning date in users table
+    // Using NOW() directly since date column is TIMESTAMP type
     const updateResult = await pool.query(
-      `UPDATE users SET date = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY, HH12:MI AM') WHERE id=$1`, 
+      `UPDATE users SET date = NOW() WHERE id=$1`, 
       [barcode_id]
     ); 
     console.log("✅ Users.date updated, rows affected:", updateResult.rowCount);
     
-    // ✅ FIX 2: Insert into scans table with IST timestamp
+    // ✅ FIX 2: Insert into scans table with NULL-safe course_type
     const courseType = u.course_type || 'Unknown';
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
     
     const insertResult = await pool.query(
-      `INSERT INTO scans (barcode_id, course_type, device_info, scanned_at) 
-       VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Asia/Kolkata') 
-       RETURNING id, TO_CHAR(scanned_at, 'DD Mon YYYY, HH12:MI AM') as scanned_at`, 
+      `INSERT INTO scans (barcode_id, course_type, device_info) VALUES ($1, $2, $3) RETURNING id, scanned_at`, 
       [barcode_id, courseType, deviceInfo]
     ); 
     console.log("✅ Scan recorded - ID:", insertResult.rows[0]?.id, "at:", insertResult.rows[0]?.scanned_at);
@@ -225,6 +214,7 @@ app.post("/api/scan", async (req, res) => {
     res.json({ success: true, data: u, scan_id: insertResult.rows[0]?.id }); 
     
   } catch (e) {
+    // ✅ FIX 3: Log actual error instead of silently failing
     console.error("❌ SCAN ERROR:", e.message);
     console.error("❌ Full error details:", e);
     res.status(500).json({ success: false, error: e.message }); 
@@ -508,7 +498,7 @@ app.get("/user/:id", async (req, res) => {
         </div>
         <div class="info-item">
           <div class="info-label">Last Scanned</div>
-          <div class="info-value" id="u-scan_date">${u.date || 'Never'}</div>
+          <div class="info-value" id="u-scan_date">${u.date ? new Date(u.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Never'}</div>
         </div>
         <div class="info-item">
           <div class="info-label">Scan Count</div>
@@ -555,6 +545,7 @@ app.get("/user/:id", async (req, res) => {
     const input = document.getElementById('scanInput');
     setInterval(() => { if (document.activeElement !== input) input.focus(); }, 100);
     
+    // ✅ NEW: Get scan count for user
     async function getScanCount(userId) {
       try {
         const res = await fetch('/api/scan-count/' + userId);
@@ -623,9 +614,7 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-amount').innerText = '₹ ' + u.amount;
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
-          
-          // ✅ FIXED: date is already a formatted IST string, display directly
-          document.getElementById('u-scan_date').innerText = u.date || 'Never';
+          document.getElementById('u-scan_date').innerText = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
           
           const up = (i, url, p) => {
             let img = document.getElementById(i);
@@ -671,7 +660,7 @@ app.get("/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ GET SCAN COUNT ENDPOINT
+// ✅ NEW: GET SCAN COUNT ENDPOINT
 // ==================================================================================
 app.get("/api/scan-count/:barcode_id", async (req, res) => {
   try {
@@ -687,14 +676,12 @@ app.get("/api/scan-count/:barcode_id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ FIXED: GET ALL SCANS (Admin) — Times in Asia/Kolkata
+// ✅ NEW: GET ALL SCANS (Admin)
 // ==================================================================================
 app.get("/api/scans", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT s.id, s.barcode_id, s.course_type, s.device_info, 
-              TO_CHAR(s.scanned_at AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY, HH12:MI AM') as scanned_at,
-              u.full_name, u.phone, u.course_type as user_course_type
+      `SELECT s.*, u.full_name, u.phone, u.course_type 
        FROM scans s 
        LEFT JOIN users u ON s.barcode_id = u.id 
        ORDER BY s.scanned_at DESC 
@@ -716,7 +703,7 @@ app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    // ✅ FIXED: date column is VARCHAR(50) to store formatted IST string
+    // ✅ FIXED: date column is now VARCHAR(50) to store formatted string
     await client.query(`CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(7) PRIMARY KEY, 
       full_name VARCHAR(255), 
@@ -736,19 +723,18 @@ async function initializeDatabase() {
       aadhar_back_image TEXT, 
       aadhar_front_image TEXT, 
       course_type VARCHAR(100),
-      created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW() AT TIME ZONE 'Asia/Kolkata'
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
     
-    // ✅ FIXED: scanned_at is TIMESTAMP WITHOUT TIME ZONE — stores raw IST
+    // ✅ FIXED: course_type allows NULL now
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
       id SERIAL PRIMARY KEY, 
       barcode_id VARCHAR(7) NOT NULL, 
       course_type VARCHAR(255), 
-      scanned_at TIMESTAMP WITHOUT TIME ZONE, 
+      scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
       device_info TEXT
     );`);
     
-    // ✅ FIXED: received_at is TIMESTAMP WITHOUT TIME ZONE — stores raw IST
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (
       id VARCHAR(7) PRIMARY KEY, 
       ref_id VARCHAR(50), 
@@ -756,10 +742,10 @@ async function initializeDatabase() {
       email VARCHAR(255), 
       phone VARCHAR(20), 
       raw_data JSONB, 
-      received_at TIMESTAMP WITHOUT TIME ZONE
+      received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
     
-    console.log("✅ Node.js DB tables ready (Asia/Kolkata timezone).");
+    console.log("✅ Node.js DB tables ready.");
   } catch (err) { 
     console.error("DB Init Error:", err); 
   } finally { 
