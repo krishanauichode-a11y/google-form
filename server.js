@@ -19,7 +19,7 @@ app.use(cors());
 app.use(session({ secret: "super-secret-key", resave: false, saveUninitialized: true }));
 
 // ==================================================================================
-// 🌐 DATABASE 1: NODE.JS DIRECT POOL
+// 🌐 NODE.JS DATABASE (For Users, Scans, Passes)
 // ==================================================================================
 const pool = new Pool({
   user: "postgres.swknmxqcgoobxxjmrspz",
@@ -31,13 +31,7 @@ const pool = new Pool({
 });
 
 // ==================================================================================
-// 🌐 DATABASE 2: SECOND SUPABASE (REST API)
-// ==================================================================================
-const DB2_URL = "https://ufbttlxvzuchacptqkee.supabase.co";
-const DB2_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmYnR0bHh2enVjaGFjcHRxa2VlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NjEyODgsImV4cCI6MjA5MjIzNzI4OH0.wbF4swxoioLEzMWno5OOGLjCq8FkryNDVqyJu048CR0";
-
-// ==================================================================================
-// 🌐 DATABASE 3: PHP SUPABASE API (DO NOT TOUCH)
+// ⚠️ PHP SUPABASE API CREDENTIALS
 // ==================================================================================
 const PHP_SUPABASE_URL = "https://uqejdqtwxpvgpolybtkg.supabase.co";
 const PHP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxZWpkcXR3eHB2Z3BvbHlidGtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTI2ODEsImV4cCI6MjA5Nzc2ODY4MX0.7kHKkN6DmC1-6wNI8l5Pee-b78N-o7zqBHEKiiCKGX0";
@@ -57,99 +51,7 @@ function generateShortId() {
 app.get("/", (req, res) => res.send("✅ Server Running"));
 
 // ==================================================================================
-// 🔍 UNIFIED USER FINDER (Checks Database 1 & Database 2)
-// ==================================================================================
-async function findUser(id) {
-  // Step 1: Check Database 1 (Node.js Direct Pool)
-  try {
-    const r = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
-    if (r.rows.length > 0) {
-      console.log(`✅ Found ${id} in Database 1 (Node.js Pool)`);
-      return { ...r.rows[0], _source: "db1" };
-    }
-  } catch (e) {
-    console.error("DB1 error:", e.message);
-  }
-
-  // Step 2: Check Database 2 (Second Supabase REST API)
-  // Try "users" table first
-  try {
-    const response = await fetch(`${DB2_URL}/rest/v1/users?id=eq.${id}&select=*`, {
-      headers: {
-        'apikey': DB2_KEY,
-        'Authorization': `Bearer ${DB2_KEY}`
-      }
-    });
-    const data = await response.json();
-    if (data.length > 0 && !data.code) {
-      console.log(`✅ Found ${id} in Database 2 (users table)`);
-      const c = data[0];
-      return {
-        id: c.id,
-        full_name: c.full_name || c.name || '',
-        email: c.email || '',
-        phone: c.phone || c.mobile || '',
-        dob: c.dob || '',
-        trading_market: c.trading_market || '',
-        trading_type: c.trading_type || '',
-        software_used: c.software_used || '',
-        amount: c.amount || 0,
-        payment_mode: c.payment_mode || '',
-        course_type: c.course_type || '',
-        created_at: c.created_at || null,
-        selfie_image: c.selfie_image || '',
-        payment_image: c.payment_image || '',
-        aadhar_front_image: c.aadhar_front_image || '',
-        aadhar_back_image: c.aadhar_back_image || '',
-        _source: "db2_users"
-      };
-    }
-  } catch (e) {
-    console.error("DB2 users table error:", e.message);
-  }
-
-  // Try "customers" table in Database 2
-  try {
-    const response = await fetch(`${DB2_URL}/rest/v1/customers?ref_id=eq.${id}&select=*`, {
-      headers: {
-        'apikey': DB2_KEY,
-        'Authorization': `Bearer ${DB2_KEY}`
-      }
-    });
-    const data = await response.json();
-    if (data.length > 0 && !data.code) {
-      console.log(`✅ Found ${id} in Database 2 (customers table)`);
-      const c = data[0];
-      return {
-        id: c.ref_id || c.id,
-        full_name: c.full_name || c.name || '',
-        email: c.email || '',
-        phone: c.mobile || c.phone || '',
-        dob: c.dob || '',
-        trading_market: c.trading_market || '',
-        trading_type: c.trading_type || '',
-        software_used: c.software_used || '',
-        amount: c.amount || c.paid_amount || 0,
-        payment_mode: c.payment_mode || '',
-        course_type: c.course_type || '',
-        created_at: c.created_at || c.paid_at || null,
-        selfie_image: c.selfie_image || '',
-        payment_image: c.payment_image || '',
-        aadhar_front_image: c.aadhar_front_image || '',
-        aadhar_back_image: c.aadhar_back_image || '',
-        _source: "db2_customers"
-      };
-    }
-  } catch (e) {
-    console.error("DB2 customers table error:", e.message);
-  }
-
-  console.log(`❌ User ${id} NOT found in Database 1 or Database 2`);
-  return null;
-}
-
-// ==================================================================================
-// 🆕 STEP 4: TRACKING LINK (DATABASE 3 ONLY - PHP SUPABASE)
+// 🆕 STEP 4: TRACKING LINK (Saves to PHP Database via API)
 // ==================================================================================
 app.get("/track", async (req, res) => {
   try {
@@ -171,7 +73,7 @@ app.get("/track", async (req, res) => {
     });
 
     const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform`;
-    console.log(`🔄 Step 4 saved to Database 3 (PHP) for ${ref_id}`);
+    console.log(`🔄 Step 4 saved to PHP DB via API for ${ref_id}`);
     return res.redirect(googleFormUrl);
     
   } catch (err) {
@@ -181,7 +83,7 @@ app.get("/track", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ STEP 5: WEBHOOK (DATABASE 3 ONLY - PHP SUPABASE)
+// ✅ STEP 5: WEBHOOK (Saves to PHP Database via API)
 // ==================================================================================
 app.post("/webhook/google-form", async (req, res) => {
   try {
@@ -204,7 +106,7 @@ app.post("/webhook/google-form", async (req, res) => {
       })
     });
     
-    console.log(`✅ Step 5 saved to Database 3 (PHP) for ref_id: ${ref_id}`);
+    console.log(`✅ Step 5 saved to PHP DB via API for ref_id: ${ref_id}`);
     res.status(200).json({ success: true });
   } catch (err) { 
     console.error("❌ WEBHOOK ERROR:", err);
@@ -213,7 +115,7 @@ app.post("/webhook/google-form", async (req, res) => {
 });
 
 // ==================================================================================
-// 🔍 FIND REF_ID BY PHONE (DATABASE 3 ONLY - PHP SUPABASE)
+// 🔍 FIND REF_ID BY PHONE (Reads from PHP Database via API)
 // ==================================================================================
 app.post("/api/find-ref-by-phone", async (req, res) => {
   try {
@@ -263,8 +165,8 @@ app.get("/api/form-responses/:ref_id", async (req, res) => {
 
 app.get("/api/user/:id", async (req, res) => { 
   try { 
-    const u = await findUser(req.params.id);
-    res.json(u ? { success: true, data: u } : { success: false }); 
+    const r = await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id]); 
+    res.json(r.rows.length===0?{success:false}:{success:true,data:r.rows[0]}); 
   } catch(e){res.json({success:false});}
 });
 
@@ -272,18 +174,11 @@ app.post("/api/scan", async (req, res) => {
   try { 
     const {barcode_id}=req.body; 
     if(!barcode_id||barcode_id.length!==7) return res.status(400).json({success:false,message:"Invalid ID"}); 
-    
-    const u = await findUser(barcode_id);
-    if(!u) return res.json({success:false,message:"Not found"}); 
-    
-    // Only log scan to Database 1 if user exists there
-    try {
-      await pool.query(`UPDATE users SET date = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') WHERE id=$1`,[barcode_id]); 
-      await pool.query(`INSERT INTO scans (barcode_id, course_type, device_info) VALUES ($1,$2,$3)`,[barcode_id,u.course_type,req.headers['user-agent']]); 
-    } catch(e) {
-      console.log(`Scan log skipped for DB1 (user from ${u._source})`);
-    }
-    
+    const ur = await pool.query("SELECT * FROM users WHERE id=$1",[barcode_id]); 
+    if(ur.rows.length===0) return res.json({success:false,message:"Not found"}); 
+    const u=ur.rows[0]; 
+    await pool.query(`UPDATE users SET date = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') WHERE id=$1`,[barcode_id]); 
+    await pool.query(`INSERT INTO scans (barcode_id, course_type, device_info) VALUES ($1,$2,$3)`,[barcode_id,u.course_type,req.headers['user-agent']]); 
     res.json({success:true,data:u}); 
   } catch(e){res.status(500).json({success:false});}
 });
@@ -315,7 +210,7 @@ app.post("/create", async (req, res) => {
     
     await pool.query(`INSERT INTO users(id,full_name,address,email,phone,dob,date,trading_market,trading_type,source,software_used,amount,payment_mode,selfie_image,payment_image,aadhar_front_image,aadhar_back_image,course_type,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,CURRENT_TIMESTAMP)`,[id,fullName,address,email,phone,dob,date,tradingMarket,tradingType,null,softwareUsed,amount,paymentMode,selfieImage,paymentImage,aadharFrontImage,aadharBackImage,courseType]); 
     
-    fs.writeFileSync(path.join(tempDir,`${id}-qr.png`),await QRCode.toBuffer(`https://google-form-kebh.onrender.com/pass/${id}`,{width:600,margin:2,errorCorrectionLevel:'H'})); 
+    fs.writeFileSync(path.join(tempDir,`${id}-qr.png`),await QRCode.toBuffer(`https://google-form-kebh.onrender.com/user/${id}`,{width:600,margin:2,errorCorrectionLevel:'H'})); 
     fs.writeFileSync(path.join(tempDir,`${id}-barcode.png`),await bwipjs.toBuffer({bcid:"code128",text:id,alttext:id,scale:3,height:25,includetext:true,textxalign:"center",padding:10})); 
     await generateFinalImage(id); 
     res.json({success:true,id}); 
@@ -327,7 +222,7 @@ app.post("/send-email", async (req, res) => {
     const {id,email}=req.body; 
     const u=(await pool.query("SELECT * FROM users WHERE id=$1",[id])).rows[0]; 
     const t=nodemailer.createTransport({host:"smtp.gmail.com",port:587,secure:false,auth:{user:process.env.EMAIL_USER,pass:process.env.EMAIL_PASS},tls:{rejectUnauthorized:false}}); 
-    await t.sendMail({from:`"Tushar Bhumkar Institute" <${process.env.EMAIL_USER}>`,to:email,subject:"🎟️ Your Entry Pass",html:`<h2>Hello ${u.full_name},</h2><p>Your entry pass is ready.</p><img src="${await generateFinalImage(id)}" width="300"/><p><a href="https://google-form-kebh.onrender.com/pass/${id}">Click here to view your pass online</a></p>`}); 
+    await t.sendMail({from:`"Tushar Bhumkar Institute" <${process.env.EMAIL_USER}>`,to:email,subject:"🎟️ Your Entry Pass",html:`<h2>Hello ${u.full_name},</h2><p>Your entry pass is ready.</p><img src="${await generateFinalImage(id)}" width="300"/>`}); 
     res.json({success:true}); 
   } catch(e){res.status(500).json({error:e.message});}
 });
@@ -344,120 +239,7 @@ app.post("/share-interakt", async (req, res) => {
 });
 
 // ==================================================================================
-// 📱 PUBLIC PASS VIEW (Checks Database 1 & Database 2 - No login required)
-// ==================================================================================
-app.get("/pass/:id", async (req, res) => { 
-  try { 
-    const u = await findUser(req.params.id); 
-    
-    if (!u) {
-      return res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Invalid Pass</title><style>body{display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:sans-serif;background:#f5f5f5}.box{text-align:center;padding:40px;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1)}.icon{font-size:60px;margin-bottom:15px}h2{color:#e53935;margin-bottom:10px}p{color:#666}</style></head><body><div class="box"><div class="icon">❌</div><h2>Invalid Pass</h2><p>This pass ID does not exist in our system.</p></div></body></html>`); 
-    }
-    
-    const formatDate = (d) => d ? new Date(d).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : 'N/A';
-    
-    res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Entry Pass - ${u.full_name}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-    body { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-    .pass-card { width: 100%; max-width: 480px; background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-    .pass-header { background: linear-gradient(135deg, #00c853, #009624); color: #fff; text-align: center; padding: 30px 20px; position: relative; }
-    .pass-header::after { content: ''; position: absolute; bottom: -15px; left: 0; right: 0; height: 30px; background: #fff; border-radius: 24px 24px 0 0; }
-    .pass-header h1 { font-size: 18px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-    .pass-header h2 { font-size: 28px; font-weight: 700; margin-top: 5px; }
-    .pass-id { display: inline-block; background: rgba(255,255,255,0.25); padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; margin-top: 10px; letter-spacing: 1px; }
-    .pass-body { padding: 30px 25px; }
-    .user-name { text-align: center; font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 20px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
-    .info-box { background: #f8f9fa; border-radius: 12px; padding: 12px 14px; }
-    .info-box .label { font-size: 11px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-    .info-box .value { font-size: 14px; color: #222; font-weight: 600; word-wrap: break-word; }
-    .divider { height: 1px; background: #e0e0e0; margin: 20px 0; }
-    .pass-image { text-align: center; margin-bottom: 20px; }
-    .pass-image img { max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
-    .status-bar { text-align: center; padding: 15px; background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border-radius: 12px; margin-bottom: 15px; }
-    .status-bar .status-text { font-size: 15px; font-weight: 600; color: #2e7d32; }
-    .pass-footer { text-align: center; padding: 20px; border-top: 1px solid #eee; }
-    .pass-footer p { font-size: 12px; color: #999; }
-    .course-badge { display: inline-block; background: linear-gradient(135deg, #003366, #00509e); color: #fff; padding: 8px 20px; border-radius: 25px; font-size: 14px; font-weight: 600; }
-    @media (max-width: 500px) {
-      .info-grid { grid-template-columns: 1fr; }
-      .pass-header h2 { font-size: 22px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="pass-card">
-    <div class="pass-header">
-      <h1>Tushar Bhumkar Institute</h1>
-      <h2>Entry Pass</h2>
-      <div class="pass-id">ID: ${u.id}</div>
-    </div>
-    
-    <div class="pass-body">
-      <div class="user-name">${u.full_name}</div>
-      <div style="text-align:center"><div class="course-badge">${u.course_type || 'Course'}</div></div>
-      
-      <div style="height: 20px;"></div>
-      
-      <div class="info-grid">
-        <div class="info-box">
-          <div class="label">📧 Email</div>
-          <div class="value">${u.email || 'N/A'}</div>
-        </div>
-        <div class="info-box">
-          <div class="label">📱 Phone</div>
-          <div class="value">${u.phone || 'N/A'}</div>
-        </div>
-        <div class="info-box">
-          <div class="label">📅 DOB</div>
-          <div class="value">${u.dob || 'N/A'}</div>
-        </div>
-        <div class="info-box">
-          <div class="label">📊 Market</div>
-          <div class="value">${u.trading_market || 'N/A'}</div>
-        </div>
-        <div class="info-box">
-          <div class="label">💲 Amount Paid</div>
-          <div class="value" style="color: #2e7d32;">₹ ${u.amount || '0'}</div>
-        </div>
-        <div class="info-box">
-          <div class="label">🕐 Created</div>
-          <div class="value">${formatDate(u.created_at)}</div>
-        </div>
-      </div>
-      
-      <div class="divider"></div>
-      
-      <div class="pass-image">
-        <img src="https://google-form-kebh.onrender.com/temp/${u.id}-final.png" alt="Entry Pass QR Code" onerror="this.style.display='none'"/>
-      </div>
-      
-      <div class="status-bar">
-        <div class="status-text">✅ Valid Entry Pass — Show at Gate</div>
-      </div>
-    </div>
-    
-    <div class="pass-footer">
-      <p>Scan QR or Barcode at the entry gate</p>
-      <p style="margin-top: 8px;">www.tusharbhumkar.com</p>
-    </div>
-  </div>
-</body>
-</html>`); 
-  } catch(e) { 
-    console.error("Pass View Error:", e);
-    res.send("Error loading pass"); 
-  }
-});
-
-// ==================================================================================
-// 🔒 ADMIN SCANNER VIEW (Login required)
+// ADMIN & USER VIEW
 // ==================================================================================
 function checkAdmin(req, res) { 
   if(req.session.isAdmin) return true; 
@@ -480,7 +262,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
 // ==================================================================================
-// DB INIT (DATABASE 1 ONLY)
+// DB INIT (ONLY INITIALIZES NODE.JS DB TABLES NOW)
 // ==================================================================================
 async function initializeDatabase() {
   const client = await pool.connect();
@@ -507,6 +289,7 @@ async function initializeDatabase() {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
 
+    // ✅ BACKFILL EXISTING NULL RECORDS
     await client.query(`UPDATE users SET created_at = NOW() WHERE created_at IS NULL;`);
 
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
