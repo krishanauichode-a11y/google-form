@@ -158,7 +158,7 @@ app.get("/api/pipeline/:ref_id", async (req, res) => {
 
 app.get("/api/form-responses/:ref_id", async (req, res) => {
   try { 
-    const r = await pool.query(`SELECT TO_CHAR(received_at AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY, HH12:MI AM') as received_at_formatted FROM google_form_responses WHERE ref_id = $1 LIMIT 1`, [req.params.ref_id]); 
+    const r = await pool.query(`SELECT TO_CHAR(received_at, 'DD Mon YYYY, HH12:MI AM') as received_at_formatted FROM google_form_responses WHERE ref_id = $1 LIMIT 1`, [req.params.ref_id]); 
     res.json({ success: r.rows.length > 0, data: r.rows[0] || null }); 
   } catch (e) { res.json({ success: false }); }
 });
@@ -171,7 +171,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ FIXED: SCAN ENDPOINT - Stores in Asia/Kolkata timezone
+// ✅ FIXED: SCAN ENDPOINT - Now properly stores in scans table and updates date
 // ==================================================================================
 app.post("/api/scan", async (req, res) => { 
   try { 
@@ -193,15 +193,15 @@ app.post("/api/scan", async (req, res) => {
     const u = ur.rows[0]; 
     console.log("✅ User found:", u.full_name, "| Course:", u.course_type);
     
-    // ✅ FIX: Update scanning date in Asia/Kolkata timezone format (YYYY-MM-DD HH24:MI:SS)
-    const kolkataTime = `TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS')`;
+    // ✅ FIX 1: Update scanning date in users table
+    // Using NOW() directly since date column is TIMESTAMP type
     const updateResult = await pool.query(
-      `UPDATE users SET date = ${kolkataTime} WHERE id=$1`, 
+      `UPDATE users SET date = NOW() WHERE id=$1`, 
       [barcode_id]
     ); 
-    console.log("✅ Users.date updated (Asia/Kolkata), rows affected:", updateResult.rowCount);
+    console.log("✅ Users.date updated, rows affected:", updateResult.rowCount);
     
-    // Insert into scans table
+    // ✅ FIX 2: Insert into scans table with NULL-safe course_type
     const courseType = u.course_type || 'Unknown';
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
     
@@ -209,19 +209,12 @@ app.post("/api/scan", async (req, res) => {
       `INSERT INTO scans (barcode_id, course_type, device_info) VALUES ($1, $2, $3) RETURNING id, scanned_at`, 
       [barcode_id, courseType, deviceInfo]
     ); 
-    console.log("✅ Scan recorded - ID:", insertResult.rows[0]?.id);
+    console.log("✅ Scan recorded - ID:", insertResult.rows[0]?.id, "at:", insertResult.rows[0]?.scanned_at);
     
-    // Get the updated date to return
-    const updated = await pool.query("SELECT date FROM users WHERE id=$1", [barcode_id]);
-    
-    res.json({ 
-      success: true, 
-      data: u, 
-      scan_id: insertResult.rows[0]?.id,
-      scanned_at: updated.rows[0]?.date  // Return the Kolkata formatted time
-    }); 
+    res.json({ success: true, data: u, scan_id: insertResult.rows[0]?.id }); 
     
   } catch (e) {
+    // ✅ FIX 3: Log actual error instead of silently failing
     console.error("❌ SCAN ERROR:", e.message);
     console.error("❌ Full error details:", e);
     res.status(500).json({ success: false, error: e.message }); 
@@ -447,6 +440,7 @@ app.get("/user/:id", async (req, res) => {
     .form-status-box { margin-top:20px; padding:16px; border-radius:10px; text-align:center; font-size:14px }
     .form-filled { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534 }
     .form-pending { background:#fffbeb; border:1px solid #fde68a; color:#92400e }
+    .scan-count { margin-top:10px; font-size:13px; color:#888; text-align:center }
     @media(max-width:767px) { .info-container { grid-template-columns:1fr } }
   </style>
 </head>
@@ -504,7 +498,7 @@ app.get("/user/:id", async (req, res) => {
         </div>
         <div class="info-item">
           <div class="info-label">Last Scanned</div>
-          <div class="info-value" id="u-scan_date">${u.date || 'Never'}</div>
+          <div class="info-value" id="u-scan_date">${u.date ? new Date(u.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Never'}</div>
         </div>
         <div class="info-item">
           <div class="info-label">Scan Count</div>
@@ -551,11 +545,16 @@ app.get("/user/:id", async (req, res) => {
     const input = document.getElementById('scanInput');
     setInterval(() => { if (document.activeElement !== input) input.focus(); }, 100);
     
+    // ✅ NEW: Get scan count for user
     async function getScanCount(userId) {
       try {
         const res = await fetch('/api/scan-count/' + userId);
         const json = await res.json();
-        document.getElementById('u-scan_count').innerText = json.success ? json.count + ' time(s)' : '0 time(s)';
+        if (json.success) {
+          document.getElementById('u-scan_count').innerText = json.count + ' time(s)';
+        } else {
+          document.getElementById('u-scan_count').innerText = '0 time(s)';
+        }
       } catch(e) {
         document.getElementById('u-scan_count').innerText = 'Error';
       }
@@ -615,14 +614,17 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-amount').innerText = '₹ ' + u.amount;
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
-          
-          // ✅ Show Asia/Kolkata time from server response
-          document.getElementById('u-scan_date').innerText = json.scanned_at || 'Just now';
+          document.getElementById('u-scan_date').innerText = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
           
           const up = (i, url, p) => {
             let img = document.getElementById(i);
-            if (url && url.length > 10) { img.src = url; img.parentElement.href = url; }
-            else { img.src = p; img.parentElement.href = "#"; }
+            if (url && url.length > 10) {
+              img.src = url;
+              img.parentElement.href = url;
+            } else {
+              img.src = p;
+              img.parentElement.href = "#";
+            }
           };
           up('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
           up('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Payment");
@@ -658,11 +660,14 @@ app.get("/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// GET SCAN COUNT
+// ✅ NEW: GET SCAN COUNT ENDPOINT
 // ==================================================================================
 app.get("/api/scan-count/:barcode_id", async (req, res) => {
   try {
-    const result = await pool.query("SELECT COUNT(*) as count FROM scans WHERE barcode_id = $1", [req.params.barcode_id]);
+    const result = await pool.query(
+      "SELECT COUNT(*) as count FROM scans WHERE barcode_id = $1", 
+      [req.params.barcode_id]
+    );
     res.json({ success: true, count: result.rows[0].count });
   } catch (e) {
     console.error("Scan count error:", e);
@@ -671,12 +676,12 @@ app.get("/api/scan-count/:barcode_id", async (req, res) => {
 });
 
 // ==================================================================================
-// GET ALL SCANS (Admin)
+// ✅ NEW: GET ALL SCANS (Admin)
 // ==================================================================================
 app.get("/api/scans", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT s.*, TO_CHAR(s.scanned_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') as scanned_at_ist, u.full_name, u.phone, u.course_type 
+      `SELECT s.*, u.full_name, u.phone, u.course_type 
        FROM scans s 
        LEFT JOIN users u ON s.barcode_id = u.id 
        ORDER BY s.scanned_at DESC 
@@ -698,6 +703,7 @@ app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
+    // ✅ FIXED: date column is now VARCHAR(50) to store formatted string
     await client.query(`CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(7) PRIMARY KEY, 
       full_name VARCHAR(255), 
@@ -720,6 +726,7 @@ async function initializeDatabase() {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
     
+    // ✅ FIXED: course_type allows NULL now
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
       id SERIAL PRIMARY KEY, 
       barcode_id VARCHAR(7) NOT NULL, 
