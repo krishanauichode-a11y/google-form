@@ -188,7 +188,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// 🛠️ FIXED SCAN ROUTE (Saves to scans table + updates 'date' column in BOTH DBs)
+// 🛠️ SCAN ROUTE (Saves to scans table + updates 'date' ONLY in Database 1)
 // ==================================================================================
 app.post("/api/scan", async (req, res) => { 
   try { 
@@ -198,41 +198,28 @@ app.post("/api/scan", async (req, res) => {
     const u = await findUser(barcode_id);
     if(!u) return res.json({success:false,message:"Not found"}); 
     
-    // 1. ALWAYS log the scan in Database 1 scans table
+    // 1. ALWAYS log the scan in Database 1 'scans' table
     await pool.query(`INSERT INTO scans (barcode_id, course_type, device_info) VALUES ($1, $2, $3)`, [
-      barcode_id, u.course_type || 'Unknown', req.headers['user-agent']
+      barcode_id, 
+      u.course_type || 'Unknown', 
+      req.headers['user-agent']
     ]); 
 
-    // 2. Update the 'date' column based on which database the user belongs to
+    // 2. Update 'date' column ONLY if the user is in Database 1
     if (u._source === "db1") {
-      // User is in Database 1
       await pool.query(`UPDATE users SET date = TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') WHERE id=$1`, [barcode_id]); 
-      
-    } else if (u._source === "db2_users") {
-      // User is in Database 2 (users table)
-      await fetch(`${DB2_URL}/rest/v1/users?id=eq.${barcode_id}`, {
-        method: 'PATCH',
-        headers: { 'apikey': DB2_KEY, 'Authorization': `Bearer ${DB2_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ date: new Date().toISOString() })
-      });
-
-    } else if (u._source === "db2_customers") {
-      // User is in Database 2 (customers table)
-      await fetch(`${DB2_URL}/rest/v1/customers?ref_id=eq.${barcode_id}`, {
-        method: 'PATCH',
-        headers: { 'apikey': DB2_KEY, 'Authorization': `Bearer ${DB2_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ date: new Date().toISOString() })
-      });
+      console.log(`📝 Scan logged & date updated in DB1 for ${barcode_id}`);
+    } else {
+      // User is from DB2, so we ONLY log the scan, we DO NOT update their date
+      console.log(`📝 Scan logged for ${barcode_id} (From ${u._source}, date not updated)`);
     }
     
-    console.log(`📝 Scan logged & date updated for ${barcode_id} (Source: ${u._source})`);
     res.json({success:true,data:u}); 
   } catch(e){ 
     console.error("Scan API Error:", e.message);
     res.status(500).json({success:false, message: e.message}); 
   }
 });
-
 // ==================================================================================
 // IMAGE GENERATION
 // ==================================================================================
