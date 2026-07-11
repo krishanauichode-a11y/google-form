@@ -36,7 +36,7 @@ const pool = new Pool({
 // every time your local computer restarts or disconnects. If this stops working,
 // you will need to paste your new Ngrok URL here and redeploy on Render.
 // ==================================================================================
-const LOCAL_PHP_API_URL = "https://ample-fantasize-cognitive.ngrok-free.dev/api.php";
+const LOCAL_PHP_API_URL = "https://ample-fantasize-cognitive.ngrok-free.dev/api_update_tracking.php";
 
 const tempDir = path.join(os.tmpdir(), "temp_passes");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
