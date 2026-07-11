@@ -171,7 +171,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ FIXED: SCAN ENDPOINT - Now properly stores in scans table and updates date
+// ✅ FIXED: SCAN ENDPOINT - Asia/Kolkata live time in users.date + scans table
 // ==================================================================================
 app.post("/api/scan", async (req, res) => { 
   try { 
@@ -193,30 +193,42 @@ app.post("/api/scan", async (req, res) => {
     const u = ur.rows[0]; 
     console.log("✅ User found:", u.full_name, "| Course:", u.course_type);
     
-    // ✅ FIX 1: Update scanning date in users table
-    // Using NOW() directly since date column is TIMESTAMP type
-    const updateResult = await pool.query(
-      `UPDATE users SET date = NOW() WHERE id=$1`, 
-      [barcode_id]
-    ); 
-    console.log("✅ Users.date updated, rows affected:", updateResult.rowCount);
+    // ✅ FIX: Get Asia/Kolkata live formatted time
+    const kolkataTime = await pool.query(
+      `SELECT TO_CHAR(
+        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 
+        'DD/MM/YYYY, HH12:MI:SS AM'
+      ) AS kolkata_now`
+    );
+    const kolkataTimeString = kolkataTime.rows[0].kolkata_now;
+    console.log("🕐 Kolkata time:", kolkataTimeString);
     
-    // ✅ FIX 2: Insert into scans table with NULL-safe course_type
+    // ✅ FIX: Store formatted Kolkata time string in users.date (VARCHAR column)
+    const updateResult = await pool.query(
+      `UPDATE users SET date = $1 WHERE id = $2`, 
+      [kolkataTimeString, barcode_id]
+    ); 
+    console.log("✅ Users.date updated with Kolkata time, rows:", updateResult.rowCount);
+    
+    // ✅ Insert into scans table with Kolkata timestamp
     const courseType = u.course_type || 'Unknown';
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
     
     const insertResult = await pool.query(
-      `INSERT INTO scans (barcode_id, course_type, device_info) VALUES ($1, $2, $3) RETURNING id, scanned_at`, 
+      `INSERT INTO scans (barcode_id, course_type, device_info, scanned_at) 
+       VALUES ($1, $2, $3, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')) 
+       RETURNING id, scanned_at`, 
       [barcode_id, courseType, deviceInfo]
     ); 
     console.log("✅ Scan recorded - ID:", insertResult.rows[0]?.id, "at:", insertResult.rows[0]?.scanned_at);
     
-    res.json({ success: true, data: u, scan_id: insertResult.rows[0]?.id }); 
+    // Return user data with updated Kolkata time
+    const returnData = { ...u, date: kolkataTimeString };
+    res.json({ success: true, data: returnData, scan_id: insertResult.rows[0]?.id }); 
     
   } catch (e) {
-    // ✅ FIX 3: Log actual error instead of silently failing
     console.error("❌ SCAN ERROR:", e.message);
-    console.error("❌ Full error details:", e);
+    console.error("❌ Full error:", e);
     res.status(500).json({ success: false, error: e.message }); 
   }
 });
@@ -302,16 +314,17 @@ async function generateFinalImage(id) {
 }
 
 // ==================================================================================
-// CREATE & SEND ROUTES
+// ✅ FIXED: CREATE - Explicitly inserts created_at with Asia/Kolkata time
 // ==================================================================================
 app.post("/create", async (req, res) => { 
   try { 
     const { fullName, address, email, phone, dob, date, tradingMarket, tradingType, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType } = req.body; 
     const id = generateShortId(); 
     
+    // ✅ FIX: Explicitly include created_at with Asia/Kolkata timestamp
     await pool.query(
-      `INSERT INTO users(id, full_name, address, email, phone, dob, date, trading_market, trading_type, source, software_used, amount, payment_mode, selfie_image, payment_image, aadhar_front_image, aadhar_back_image, course_type) 
-       VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`, 
+      `INSERT INTO users(id, full_name, address, email, phone, dob, date, trading_market, trading_type, source, software_used, amount, payment_mode, selfie_image, payment_image, aadhar_front_image, aadhar_back_image, course_type, created_at) 
+       VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`, 
       [id, fullName, address, email, phone, dob, date, tradingMarket, tradingType, null, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType]
     ); 
     
@@ -319,7 +332,7 @@ app.post("/create", async (req, res) => {
     fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 })); 
     await generateFinalImage(id); 
     
-    console.log("✅ User created:", id, fullName);
+    console.log("✅ User created:", id, fullName, "| created_at set to Asia/Kolkata time");
     res.json({ success: true, id }); 
   } catch (e) {
     console.error("❌ CREATE ERROR:", e.message);
@@ -407,6 +420,10 @@ app.get("/user/:id", async (req, res) => {
     const u = (await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id])).rows[0]; 
     if (!u) return res.send("<h2>❌ Invalid QR</h2>"); 
     const gi = (url) => url || "https://via.placeholder.com/150?text=No+Image"; 
+    
+    // ✅ FIX: Format created_at in Asia/Kolkata for display
+    const createdAtDisplay = u.created_at ? new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'N/A';
+    const scanDateDisplay = u.date || 'Never';
     
     res.send(`<!DOCTYPE html>
 <html>
@@ -497,8 +514,12 @@ app.get("/user/:id", async (req, res) => {
           <div class="info-value" id="u-course">${u.course_type}</div>
         </div>
         <div class="info-item">
+          <div class="info-label">Created At</div>
+          <div class="info-value" id="u-created_at">${createdAtDisplay}</div>
+        </div>
+        <div class="info-item">
           <div class="info-label">Last Scanned</div>
-          <div class="info-value" id="u-scan_date">${u.date ? new Date(u.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Never'}</div>
+          <div class="info-value" id="u-scan_date">${scanDateDisplay}</div>
         </div>
         <div class="info-item">
           <div class="info-label">Scan Count</div>
@@ -545,7 +566,6 @@ app.get("/user/:id", async (req, res) => {
     const input = document.getElementById('scanInput');
     setInterval(() => { if (document.activeElement !== input) input.focus(); }, 100);
     
-    // ✅ NEW: Get scan count for user
     async function getScanCount(userId) {
       try {
         const res = await fetch('/api/scan-count/' + userId);
@@ -614,7 +634,20 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-amount').innerText = '₹ ' + u.amount;
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
-          document.getElementById('u-scan_date').innerText = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+          
+          // ✅ FIX: Show Kolkata time returned from server (already formatted)
+          document.getElementById('u-scan_date').innerText = u.date || 'Never';
+          
+          // ✅ FIX: Show created_at in Asia/Kolkata
+          if (u.created_at) {
+            document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', { 
+              timeZone: 'Asia/Kolkata', 
+              day: '2-digit', month: '2-digit', year: 'numeric', 
+              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
+            });
+          } else {
+            document.getElementById('u-created_at').innerText = 'N/A';
+          }
           
           const up = (i, url, p) => {
             let img = document.getElementById(i);
@@ -660,7 +693,7 @@ app.get("/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ NEW: GET SCAN COUNT ENDPOINT
+// ✅ GET SCAN COUNT ENDPOINT
 // ==================================================================================
 app.get("/api/scan-count/:barcode_id", async (req, res) => {
   try {
@@ -676,7 +709,7 @@ app.get("/api/scan-count/:barcode_id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ NEW: GET ALL SCANS (Admin)
+// ✅ GET ALL SCANS (Admin)
 // ==================================================================================
 app.get("/api/scans", async (req, res) => {
   try {
@@ -698,12 +731,12 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
 // ==================================================================================
-// DB INIT
+// ✅ FIXED: DB INIT - Adds created_at column if missing on existing table
 // ==================================================================================
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    // ✅ FIXED: date column is now VARCHAR(50) to store formatted string
+    // Create table if not exists (without created_at to avoid conflict)
     await client.query(`CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(7) PRIMARY KEY, 
       full_name VARCHAR(255), 
@@ -722,11 +755,27 @@ async function initializeDatabase() {
       payment_image TEXT, 
       aadhar_back_image TEXT, 
       aadhar_front_image TEXT, 
-      course_type VARCHAR(100),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      course_type VARCHAR(100)
     );`);
     
-    // ✅ FIXED: course_type allows NULL now
+    // ✅ FIX: Add created_at column to EXISTING table if it doesn't exist
+    // CREATE TABLE IF NOT EXISTS won't add new columns, so we use ALTER TABLE
+    await client.query(`
+      DO $$       BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'created_at'
+        ) THEN
+          ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+          -- Backfill any existing rows that have NULL created_at
+          UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;
+          RAISE NOTICE '✅ created_at column added to users table';
+        ELSE
+          RAISE NOTICE '✅ created_at column already exists in users table';
+        END IF;
+      END $$;
+    `);
+    
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
       id SERIAL PRIMARY KEY, 
       barcode_id VARCHAR(7) NOT NULL, 
@@ -745,7 +794,7 @@ async function initializeDatabase() {
       received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
     
-    console.log("✅ Node.js DB tables ready.");
+    console.log("✅ Node.js DB tables ready (created_at fix applied).");
   } catch (err) { 
     console.error("DB Init Error:", err); 
   } finally { 
