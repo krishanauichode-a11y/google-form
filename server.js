@@ -19,7 +19,7 @@ app.use(cors());
 app.use(session({ secret: "super-secret-key", resave: false, saveUninitialized: true }));
 
 // ==================================================================================
-// 🌐 NODE.JS DATABASE (For Users, Scans, Passes)
+// 🌐 NODE.JS DATABASE (For Users, Scans, Passes - Remains Unchanged)
 // ==================================================================================
 const pool = new Pool({
   user: "postgres.swknmxqcgoobxxjmrspz",
@@ -31,10 +31,12 @@ const pool = new Pool({
 });
 
 // ==================================================================================
-// ⚠️ PHP SUPABASE API CREDENTIALS
+// ✅ NEW: LOCAL XAMPP PHP API ENDPOINT
+// ⚠️ WARNING: Because you are using a Free Ngrok URL, this URL CHANGES 
+// every time your local computer restarts or disconnects. If this stops working,
+// you will need to paste your new Ngrok URL here and redeploy on Render.
 // ==================================================================================
-const PHP_SUPABASE_URL = "https://uqejdqtwxpvgpolybtkg.supabase.co";
-const PHP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxZWpkcXR3eHB2Z3BvbHlidGtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTI2ODEsImV4cCI6MjA5Nzc2ODY4MX0.7kHKkN6DmC1-6wNI8l5Pee-b78N-o7zqBHEKiiCKGX0";
+const LOCAL_PHP_API_URL = "https://ample-fantasize-cognitive.ngrok-free.dev/api.php";
 
 const tempDir = path.join(os.tmpdir(), "temp_passes");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
@@ -51,29 +53,18 @@ function generateShortId() {
 app.get("/", (req, res) => res.send("✅ Server Running"));
 
 // ==================================================================================
-// 🆕 STEP 4: TRACKING LINK (Saves to PHP Database via API)
+// 🆕 STEP 4: TRACKING LINK (Saves to Local PHP Database via API)
 // ==================================================================================
 app.get("/track", async (req, res) => {
   try {
     const { ref_id } = req.query;
     if (!ref_id) return res.status(400).send("Missing reference ID");
 
-    await fetch(PHP_SUPABASE_URL + '/rest/v1/client_pipeline', {
-      method: 'POST',
-      headers: {
-        'apikey': PHP_SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${PHP_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({
-        ref_id: ref_id,
-        step_4_form_opened_at: new Date().toISOString()
-      })
-    });
+    // ✅ UPDATED: Call Local PHP API instead of Supabase
+    await fetch(`${LOCAL_PHP_API_URL}?action=update_step_4&ref_id=${encodeURIComponent(ref_id)}`);
 
     const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform`;
-    console.log(`🔄 Step 4 saved to PHP DB via API for ${ref_id}`);
+    console.log(`🔄 Step 4 saved to Local PHP DB via API for ${ref_id}`);
     return res.redirect(googleFormUrl);
     
   } catch (err) {
@@ -83,30 +74,24 @@ app.get("/track", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ STEP 5: WEBHOOK (Saves to PHP Database via API)
+// ✅ STEP 5: WEBHOOK (Saves to Local PHP Database via API)
 // ==================================================================================
 app.post("/webhook/google-form", async (req, res) => {
   try {
     const { ref_id } = req.body;
     if (!ref_id) return res.status(400).json({ error: "Missing ref_id" });
     
+    // Save to Node.js Postgres DB for internal tracking
     await pool.query(`INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) VALUES ($1, $2, $3, NOW()) ON CONFLICT (id) DO NOTHING`, [generateShortId(), ref_id, JSON.stringify(req.body)]);
     
-    await fetch(PHP_SUPABASE_URL + '/rest/v1/client_pipeline', {
+    // ✅ UPDATED: Call Local PHP API instead of Supabase
+    await fetch(LOCAL_PHP_API_URL, {
       method: 'POST',
-      headers: {
-        'apikey': PHP_SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${PHP_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({
-        ref_id: ref_id,
-        step_5_form_submitted_at: new Date().toISOString()
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_step_5', ref_id: ref_id })
     });
     
-    console.log(`✅ Step 5 saved to PHP DB via API for ref_id: ${ref_id}`);
+    console.log(`✅ Step 5 saved to Local PHP DB via API for ref_id: ${ref_id}`);
     res.status(200).json({ success: true });
   } catch (err) { 
     console.error("❌ WEBHOOK ERROR:", err);
@@ -115,31 +100,29 @@ app.post("/webhook/google-form", async (req, res) => {
 });
 
 // ==================================================================================
-// 🔍 FIND REF_ID BY PHONE (Reads from PHP Database via API)
+// 🔍 FIND REF_ID BY PHONE (Reads from Local PHP Database via API)
 // ==================================================================================
 app.post("/api/find-ref-by-phone", async (req, res) => {
   try {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: "Missing phone" });
     
-    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-    
-    const response = await fetch(`${PHP_SUPABASE_URL}/rest/v1/customers?select=ref_id&mobile=ilike.%25${cleanPhone}%25&payment_status=eq.paid&order=paid_at.desc&limit=1`, {
-      headers: {
-        'apikey': PHP_SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${PHP_SUPABASE_ANON_KEY}`
-      }
+    // ✅ UPDATED: Call Local PHP API instead of Supabase
+    const response = await fetch(LOCAL_PHP_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'find_by_phone', phone: phone })
     });
     
     const data = await response.json();
     
-    if (data.length > 0) {
-      console.log(`✅ Found ref_id ${data[0].ref_id} for phone ${cleanPhone}`);
-      res.json({ success: true, ref_id: data[0].ref_id });
+    if (data.success) {
+      console.log(`✅ Found ref_id ${data.ref_id} for phone ${phone}`);
     } else {
-      console.log(`❌ No payment found for phone ${cleanPhone}`);
-      res.json({ success: false, error: "No matching payment found" });
+      console.log(`❌ No payment found for phone ${phone}`);
     }
+    
+    res.json(data);
   } catch (err) {
     console.error("Find Phone Error:", err);
     res.status(500).json({ error: err.message });
@@ -147,7 +130,7 @@ app.post("/api/find-ref-by-phone", async (req, res) => {
 });
 
 // ==================================================================================
-// OTHER API ROUTES
+// OTHER API ROUTES (Unchanged - These talk to Node.js Postgres DB)
 // ==================================================================================
 app.get("/api/pipeline/:ref_id", async (req, res) => {
   try { 
@@ -183,7 +166,6 @@ app.post("/api/scan", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid ID" }); 
     }
     
-    // Check if user exists
     const ur = await pool.query("SELECT * FROM users WHERE id=$1", [barcode_id]); 
     if (ur.rows.length === 0) {
       console.log("❌ User not found for barcode:", barcode_id);
@@ -193,24 +175,15 @@ app.post("/api/scan", async (req, res) => {
     const u = ur.rows[0]; 
     console.log("✅ User found:", u.full_name, "| Course:", u.course_type);
     
-    // ✅ FIX: Get Asia/Kolkata live formatted time
     const kolkataTime = await pool.query(
-      `SELECT TO_CHAR(
-        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 
-        'DD/MM/YYYY, HH12:MI:SS AM'
-      ) AS kolkata_now`
+      `SELECT TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 'DD/MM/YYYY, HH12:MI:SS AM') AS kolkata_now`
     );
     const kolkataTimeString = kolkataTime.rows[0].kolkata_now;
     console.log("🕐 Kolkata time:", kolkataTimeString);
     
-    // ✅ FIX: Store formatted Kolkata time string in users.date (VARCHAR column)
-    const updateResult = await pool.query(
-      `UPDATE users SET date = $1 WHERE id = $2`, 
-      [kolkataTimeString, barcode_id]
-    ); 
+    const updateResult = await pool.query(`UPDATE users SET date = $1 WHERE id = $2`, [kolkataTimeString, barcode_id]); 
     console.log("✅ Users.date updated with Kolkata time, rows:", updateResult.rowCount);
     
-    // ✅ Insert into scans table with Kolkata timestamp
     const courseType = u.course_type || 'Unknown';
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
     
@@ -222,7 +195,6 @@ app.post("/api/scan", async (req, res) => {
     ); 
     console.log("✅ Scan recorded - ID:", insertResult.rows[0]?.id, "at:", insertResult.rows[0]?.scanned_at);
     
-    // Return user data with updated Kolkata time
     const returnData = { ...u, date: kolkataTimeString };
     res.json({ success: true, data: returnData, scan_id: insertResult.rows[0]?.id }); 
     
@@ -321,7 +293,6 @@ app.post("/create", async (req, res) => {
     const { fullName, address, email, phone, dob, date, tradingMarket, tradingType, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType } = req.body; 
     const id = generateShortId(); 
     
-    // ✅ FIX: Explicitly include created_at with Asia/Kolkata timestamp
     await pool.query(
       `INSERT INTO users(id, full_name, address, email, phone, dob, date, trading_market, trading_type, source, software_used, amount, payment_mode, selfie_image, payment_image, aadhar_front_image, aadhar_back_image, course_type, created_at) 
        VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`, 
@@ -421,7 +392,6 @@ app.get("/user/:id", async (req, res) => {
     if (!u) return res.send("<h2>❌ Invalid QR</h2>"); 
     const gi = (url) => url || "https://via.placeholder.com/150?text=No+Image"; 
     
-    // ✅ FIX: Format created_at in Asia/Kolkata for display
     const createdAtDisplay = u.created_at ? new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'N/A';
     const scanDateDisplay = u.date || 'Never';
     
@@ -635,10 +605,8 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
           
-          // ✅ FIX: Show Kolkata time returned from server (already formatted)
           document.getElementById('u-scan_date').innerText = u.date || 'Never';
           
-          // ✅ FIX: Show created_at in Asia/Kolkata
           if (u.created_at) {
             document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', { 
               timeZone: 'Asia/Kolkata', 
@@ -697,10 +665,7 @@ app.get("/user/:id", async (req, res) => {
 // ==================================================================================
 app.get("/api/scan-count/:barcode_id", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT COUNT(*) as count FROM scans WHERE barcode_id = $1", 
-      [req.params.barcode_id]
-    );
+    const result = await pool.query("SELECT COUNT(*) as count FROM scans WHERE barcode_id = $1", [req.params.barcode_id]);
     res.json({ success: true, count: result.rows[0].count });
   } catch (e) {
     console.error("Scan count error:", e);
@@ -736,7 +701,6 @@ app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    // Create table if not exists (without created_at to avoid conflict)
     await client.query(`CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(7) PRIMARY KEY, 
       full_name VARCHAR(255), 
@@ -758,8 +722,6 @@ async function initializeDatabase() {
       course_type VARCHAR(100)
     );`);
     
-    // ✅ FIX: Add created_at column to EXISTING table if it doesn't exist
-    // CREATE TABLE IF NOT EXISTS won't add new columns, so we use ALTER TABLE
     await client.query(`
       DO $$       BEGIN
         IF NOT EXISTS (
@@ -767,7 +729,6 @@ async function initializeDatabase() {
           WHERE table_name = 'users' AND column_name = 'created_at'
         ) THEN
           ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-          -- Backfill any existing rows that have NULL created_at
           UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;
           RAISE NOTICE '✅ created_at column added to users table';
         ELSE
