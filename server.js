@@ -183,7 +183,6 @@ app.post("/api/scan", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid ID" }); 
     }
     
-    // Check if user exists
     const ur = await pool.query("SELECT * FROM users WHERE id=$1", [barcode_id]); 
     if (ur.rows.length === 0) {
       console.log("❌ User not found for barcode:", barcode_id);
@@ -193,24 +192,15 @@ app.post("/api/scan", async (req, res) => {
     const u = ur.rows[0]; 
     console.log("✅ User found:", u.full_name, "| Course:", u.course_type);
     
-    // ✅ FIX: Get Asia/Kolkata live formatted time
     const kolkataTime = await pool.query(
-      `SELECT TO_CHAR(
-        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 
-        'DD/MM/YYYY, HH12:MI:SS AM'
-      ) AS kolkata_now`
+      `SELECT TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 'DD/MM/YYYY, HH12:MI:SS AM') AS kolkata_now`
     );
     const kolkataTimeString = kolkataTime.rows[0].kolkata_now;
     console.log("🕐 Kolkata time:", kolkataTimeString);
     
-    // ✅ FIX: Store formatted Kolkata time string in users.date (VARCHAR column)
-    const updateResult = await pool.query(
-      `UPDATE users SET date = $1 WHERE id = $2`, 
-      [kolkataTimeString, barcode_id]
-    ); 
+    const updateResult = await pool.query(`UPDATE users SET date = $1 WHERE id = $2`, [kolkataTimeString, barcode_id]); 
     console.log("✅ Users.date updated with Kolkata time, rows:", updateResult.rowCount);
     
-    // ✅ Insert into scans table with Kolkata timestamp
     const courseType = u.course_type || 'Unknown';
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
     
@@ -222,13 +212,11 @@ app.post("/api/scan", async (req, res) => {
     ); 
     console.log("✅ Scan recorded - ID:", insertResult.rows[0]?.id, "at:", insertResult.rows[0]?.scanned_at);
     
-    // Return user data with updated Kolkata time
     const returnData = { ...u, date: kolkataTimeString };
     res.json({ success: true, data: returnData, scan_id: insertResult.rows[0]?.id }); 
     
   } catch (e) {
     console.error("❌ SCAN ERROR:", e.message);
-    console.error("❌ Full error:", e);
     res.status(500).json({ success: false, error: e.message }); 
   }
 });
@@ -321,7 +309,6 @@ app.post("/create", async (req, res) => {
     const { fullName, address, email, phone, dob, date, tradingMarket, tradingType, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType } = req.body; 
     const id = generateShortId(); 
     
-    // ✅ FIX: Explicitly include created_at with Asia/Kolkata timestamp
     await pool.query(
       `INSERT INTO users(id, full_name, address, email, phone, dob, date, trading_market, trading_type, source, software_used, amount, payment_mode, selfie_image, payment_image, aadhar_front_image, aadhar_back_image, course_type, created_at) 
        VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`, 
@@ -341,7 +328,7 @@ app.post("/create", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ FIXED: SEND EMAIL - Embeds QR/Barcode image as inline attachment (CID)
+// ✅ ULTIMATE FIX: SEND EMAIL - Anti-Spam + Embedded Image Buffer + Auto-Regen
 // ==================================================================================
 app.post("/send-email", async (req, res) => { 
   try { 
@@ -350,22 +337,39 @@ app.post("/send-email", async (req, res) => {
     
     if (!u) return res.status(404).json({ error: "User not found" });
     
-    // ✅ Get local image path
+    // 1. Get all required image paths
     const finalImagePath = path.join(tempDir, `${id}-final.png`);
     const qrImagePath = path.join(tempDir, `${id}-qr.png`);
     const barcodeImagePath = path.join(tempDir, `${id}-barcode.png`);
     
-    // ✅ Regenerate if image doesn't exist
-    if (!fs.existsSync(finalImagePath)) {
-      console.log(`🔄 Regenerating image for ${id}`);
+    // 2. Auto-regenerate if Render cleared the temp directory
+    if (!fs.existsSync(finalImagePath) || !fs.existsSync(qrImagePath) || !fs.existsSync(barcodeImagePath)) {
+      console.log(`🔄 Regenerating missing images for ${id}...`);
+      
+      if (!fs.existsSync(qrImagePath)) {
+        const qrBuffer = await QRCode.toBuffer(`https://google-form-kebh.onrender.com/user/${id}`, { width: 600, margin: 2, errorCorrectionLevel: 'H' });
+        fs.writeFileSync(qrImagePath, qrBuffer);
+      }
+      
+      if (!fs.existsSync(barcodeImagePath)) {
+        const barBuffer = await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 });
+        fs.writeFileSync(barcodeImagePath, barBuffer);
+      }
+      
       await generateFinalImage(id);
     }
     
-    // ✅ Final check
+    // 3. Final verification
     if (!fs.existsSync(finalImagePath)) {
-      return res.status(500).json({ error: "Failed to generate image" });
+      console.error(`❌ Critical: Failed to generate image for ${id}`);
+      return res.status(500).json({ error: "Failed to generate entry pass image" });
     }
     
+    // 4. Read file into memory buffer (more reliable than passing path)
+    const imageBuffer = fs.readFileSync(finalImagePath);
+    console.log(`✅ Image loaded into memory: ${(imageBuffer.length / 1024).toFixed(2)} KB`);
+    
+    // 5. Create transporter
     const t = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
@@ -374,73 +378,96 @@ app.post("/send-email", async (req, res) => {
       tls: { rejectUnauthorized: false }
     }); 
     
-    // ✅ Build attachments array
-    const attachments = [
-      {
-        filename: 'entry-pass.png',
-        path: finalImagePath,
-        cid: 'entrypass'
-      }
-    ];
-    
-    // Add QR code as downloadable attachment if exists
-    if (fs.existsSync(qrImagePath)) {
-      attachments.push({
-        filename: 'qr-code.png',
-        path: qrImagePath
-      });
-    }
-    
-    // Add barcode as downloadable attachment if exists
-    if (fs.existsSync(barcodeImagePath)) {
-      attachments.push({
-        filename: 'barcode.png',
-        path: barcodeImagePath
-      });
-    }
-    
-    await t.sendMail({
-      from: `"Tushar Bhumkar Institute" <${process.env.EMAIL_USER}>`,
+    // 6. Send email with strict anti-spam properties
+    const mailResult = await t.sendMail({
+      from: process.env.EMAIL_USER, // Simple 'from' avoids spam triggers
       to: email,
-      subject: "🎟️ Your Entry Pass - Tushar Bhumkar Institute",
+      replyTo: process.env.EMAIL_USER,
+      
+      // Clean subject without emojis
+      subject: `Your Entry Pass - ${u.full_name} - ID: ${id}`,
+      
+      // CRITICAL: Plain text version prevents spam classification
+      text: `Hello ${u.full_name},\n\nYour entry pass is ready!\n\nYour ID: ${id}\nCourse: ${u.course_type || 'N/A'}\n\nPlease show this pass at the entry gate.\n\n- Tushar Bhumkar Institute\nwww.tusharbhumkar.com`,
+      
+      // HTML version with table layout (best for email clients)
       html: `
-        <div style="text-align: center; font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9;">
-          <div style="max-width: 500px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #003366; margin-bottom: 10px;">Hello ${u.full_name},</h2>
-            <p style="color: #555; font-size: 16px; margin-bottom: 25px;">Your entry pass is ready. Please show this pass at the entry gate.</p>
-            
-            <div style="margin: 25px 0;">
-              <img src="cid:entrypass" width="280" style="max-width: 100%; height: auto; border: 1px solid #e0e0e0; border-radius: 8px;"/>
-            </div>
-            
-            <div style="background: #f0f7ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <p style="color: #003366; font-size: 14px; margin: 0;">
-                <strong>📱 Instructions:</strong> Scan the QR code or Barcode at the entry gate
-              </p>
-            </div>
-            
-            <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px;">
-              <p style="color: #999; font-size: 12px; margin: 0;">
-                <strong>Your ID:</strong> ${u.id}<br/>
-                <strong>Course:</strong> ${u.course_type || 'N/A'}
-              </p>
-            </div>
-          </div>
-          
-          <p style="color: #aaa; font-size: 11px; margin-top: 25px;">
-            Tushar Bhumkar Institute | www.tusharbhumkar.com
-          </p>
-        </div>
-      `,
-      attachments: attachments
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+</head>
+<body style="margin:0; padding:0; background-color:#f4f4f4; font-family: Arial, Helvetica, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4; padding:20px;">
+    <tr>
+      <td align="center">
+        <table width="500" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color:#003366; padding:25px 30px; text-align:center;">
+              <h1 style="margin:0; color:#ffffff; font-size:22px; font-weight:bold;">Tushar Bhumkar Institute</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:30px;">
+              <h2 style="margin:0 0 10px 0; color:#003366; font-size:20px;">Hello ${u.full_name},</h2>
+              <p style="margin:0 0 20px 0; color:#555555; font-size:15px; line-height:1.5;">Your entry pass is ready. Please show this pass at the entry gate.</p>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding:15px 0;">
+                    <img src="cid:entrypass" width="280" style="max-width:100%; height:auto; border:1px solid #e0e0e0; border-radius:6px; display:block;" alt="Entry Pass">
+                  </td>
+                </tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;">
+                <tr>
+                  <td style="background-color:#f0f7ff; padding:15px; border-radius:6px; border-left:4px solid #003366;">
+                    <p style="margin:0 0 5px 0; color:#003366; font-size:14px;"><strong>Your ID:</strong> ${id}</p>
+                    <p style="margin:0 0 5px 0; color:#003366; font-size:14px;"><strong>Course:</strong> ${u.course_type || 'N/A'}</p>
+                    <p style="margin:0; color:#003366; font-size:14px;"><strong>Instructions:</strong> Scan QR or Barcode at entry</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f9f9f9; padding:20px 30px; text-align:center; border-top:1px solid #eeeeee;">
+              <p style="margin:0 0 5px 0; color:#999999; font-size:12px;">Tushar Bhumkar Institute</p>
+              <p style="margin:0; color:#999999; font-size:12px;">www.tusharbhumkar.com</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+      
+      // Embed image directly from buffer
+      attachments: [
+        {
+          filename: 'entry-pass.png',
+          content: imageBuffer, 
+          contentType: 'image/png',
+          contentDisposition: 'inline', 
+          cid: 'entrypass' 
+        }
+      ],
+      
+      // Extra headers to avoid spam folder
+      headers: {
+        'X-Priority': '1',
+        'X-MS-Priority': 'High',
+        'Importance': 'high',
+        'X-Mailer': 'TusharBhumkarInstitute/1.0',
+        'List-Unsubscribe': `<mailto:${process.env.EMAIL_USER}?subject=unsubscribe>`
+      }
     }); 
     
-    console.log(`✅ Email with embedded image sent to ${email} for user ${id}`);
-    res.json({ success: true }); 
+    console.log(`✅ Email sent successfully to ${email} | ID: ${mailResult.messageId}`);
+    res.json({ success: true, messageId: mailResult.messageId }); 
     
   } catch (e) {
     console.error("❌ EMAIL ERROR:", e.message);
-    console.error("❌ Full error:", e);
     res.status(500).json({ error: e.message }); 
   }
 });
@@ -502,7 +529,6 @@ app.get("/user/:id", async (req, res) => {
     if (!u) return res.send("<h2>❌ Invalid QR</h2>"); 
     const gi = (url) => url || "https://via.placeholder.com/150?text=No+Image"; 
     
-    // ✅ FIX: Format created_at in Asia/Kolkata for display
     const createdAtDisplay = u.created_at ? new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'N/A';
     const scanDateDisplay = u.date || 'Never';
     
@@ -554,86 +580,27 @@ app.get("/user/:id", async (req, res) => {
     </div>
     <div class="card-body">
       <div class="info-container">
-        <div class="info-item">
-          <div class="info-label">Name</div>
-          <div class="info-value" id="u-full_name">${u.full_name}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Email</div>
-          <div class="info-value" id="u-email">${u.email}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Phone</div>
-          <div class="info-value" id="u-phone">${u.phone}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">DOB</div>
-          <div class="info-value" id="u-dob">${u.dob}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Market</div>
-          <div class="info-value" id="u-market">${u.trading_market}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Type</div>
-          <div class="info-value" id="u-type">${u.trading_type}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Software</div>
-          <div class="info-value" id="u-software">${u.software_used}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Paid</div>
-          <div class="info-value" id="u-amount">₹ ${u.amount}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Mode</div>
-          <div class="info-value" id="u-mode">${u.payment_mode}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Course Type</div>
-          <div class="info-value" id="u-course">${u.course_type}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Created At</div>
-          <div class="info-value" id="u-created_at">${createdAtDisplay}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Last Scanned</div>
-          <div class="info-value" id="u-scan_date">${scanDateDisplay}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Scan Count</div>
-          <div class="info-value" id="u-scan_count">Loading...</div>
-        </div>
+        <div class="info-item"><div class="info-label">Name</div><div class="info-value" id="u-full_name">${u.full_name}</div></div>
+        <div class="info-item"><div class="info-label">Email</div><div class="info-value" id="u-email">${u.email}</div></div>
+        <div class="info-item"><div class="info-label">Phone</div><div class="info-value" id="u-phone">${u.phone}</div></div>
+        <div class="info-item"><div class="info-label">DOB</div><div class="info-value" id="u-dob">${u.dob}</div></div>
+        <div class="info-item"><div class="info-label">Market</div><div class="info-value" id="u-market">${u.trading_market}</div></div>
+        <div class="info-item"><div class="info-label">Type</div><div class="info-value" id="u-type">${u.trading_type}</div></div>
+        <div class="info-item"><div class="info-label">Software</div><div class="info-value" id="u-software">${u.software_used}</div></div>
+        <div class="info-item"><div class="info-label">Paid</div><div class="info-value" id="u-amount">₹ ${u.amount}</div></div>
+        <div class="info-item"><div class="info-label">Mode</div><div class="info-value" id="u-mode">${u.payment_mode}</div></div>
+        <div class="info-item"><div class="info-label">Course Type</div><div class="info-value" id="u-course">${u.course_type}</div></div>
+        <div class="info-item"><div class="info-label">Created At</div><div class="info-value" id="u-created_at">${createdAtDisplay}</div></div>
+        <div class="info-item"><div class="info-label">Last Scanned</div><div class="info-value" id="u-scan_date">${scanDateDisplay}</div></div>
+        <div class="info-item"><div class="info-label">Scan Count</div><div class="info-value" id="u-scan_count">Loading...</div></div>
       </div>
       <div style="margin-top:25px;">
         <h3 style="margin-bottom:10px;text-align:center;">Verification Documents</h3>
         <div class="images-grid">
-          <div class="image-card">
-            <div>Selfie</div>
-            <a href="${gi(u.selfie_image)}" target="_blank">
-              <img id="u-selfie" src="${gi(u.selfie_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'"/>
-            </a>
-          </div>
-          <div class="image-card">
-            <div>Payment Proof</div>
-            <a href="${gi(u.payment_image)}" target="_blank">
-              <img id="u-payment" src="${gi(u.payment_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Payment'"/>
-            </a>
-          </div>
-          <div class="image-card">
-            <div>Aadhar Front</div>
-            <a href="${gi(u.aadhar_front_image)}" target="_blank">
-              <img id="u-aadhar_front" src="${gi(u.aadhar_front_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'"/>
-            </a>
-          </div>
-          <div class="image-card">
-            <div>Aadhar Back</div>
-            <a href="${gi(u.aadhar_back_image)}" target="_blank">
-              <img id="u-aadhar_back" src="${gi(u.aadhar_back_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'"/>
-            </a>
-          </div>
+          <div class="image-card"><div>Selfie</div><a href="${gi(u.selfie_image)}" target="_blank"><img id="u-selfie" src="${gi(u.selfie_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'"/></a></div>
+          <div class="image-card"><div>Payment Proof</div><a href="${gi(u.payment_image)}" target="_blank"><img id="u-payment" src="${gi(u.payment_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Payment'"/></a></div>
+          <div class="image-card"><div>Aadhar Front</div><a href="${gi(u.aadhar_front_image)}" target="_blank"><img id="u-aadhar_front" src="${gi(u.aadhar_front_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'"/></a></div>
+          <div class="image-card"><div>Aadhar Back</div><a href="${gi(u.aadhar_back_image)}" target="_blank"><img id="u-aadhar_back" src="${gi(u.aadhar_back_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'"/></a></div>
         </div>
       </div>
       <div id="formStatusBox" class="form-status-box form-pending">🔄 Checking KYC Form status...</div>
@@ -642,126 +609,14 @@ app.get("/user/:id", async (req, res) => {
     </div>
     <div class="card-footer">Scan QR / Barcode at Entry Gate</div>
   </div>
-  
   <script>
     const input = document.getElementById('scanInput');
     setInterval(() => { if (document.activeElement !== input) input.focus(); }, 100);
-    
-    async function getScanCount(userId) {
-      try {
-        const res = await fetch('/api/scan-count/' + userId);
-        const json = await res.json();
-        if (json.success) {
-          document.getElementById('u-scan_count').innerText = json.count + ' time(s)';
-        } else {
-          document.getElementById('u-scan_count').innerText = '0 time(s)';
-        }
-      } catch(e) {
-        document.getElementById('u-scan_count').innerText = 'Error';
-      }
-    }
-    
-    async function checkFormStatus(userId) {
-      try {
-        const res = await fetch('/api/form-responses/' + userId);
-        const json = await res.json();
-        const box = document.getElementById('formStatusBox');
-        if (json.success && json.data) {
-          box.className = 'form-status-box form-filled';
-          box.innerHTML = '✅ KYC Form Filled — ' + json.data.received_at_formatted;
-        } else {
-          box.className = 'form-status-box form-pending';
-          box.innerHTML = '⏳ KYC Form Not Yet Filled';
-        }
-      } catch (e) {
-        document.getElementById('formStatusBox').innerHTML = 'ℹ️ Status unavailable';
-      }
-    }
-    
-    checkFormStatus('${u.id}');
-    getScanCount('${u.id}');
-    
-    input.addEventListener('keydown', async function(e) {
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        const id = input.value.trim();
-        input.value = '';
-        if (id) {
-          window.history.pushState({}, "", "/user/" + id);
-          await loadUserData(id);
-        }
-      }
-    });
-    
-    async function loadUserData(id) {
-      try {
-        const res = await fetch('/api/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ barcode_id: id })
-        });
-        const json = await res.json();
-        
-        if (json.success) {
-          const u = json.data;
-          document.getElementById('error-display').style.display = 'none';
-          document.getElementById('u-full_name').innerText = u.full_name;
-          document.getElementById('u-email').innerText = u.email;
-          document.getElementById('u-phone').innerText = u.phone;
-          document.getElementById('u-dob').innerText = u.dob;
-          document.getElementById('u-market').innerText = u.trading_market;
-          document.getElementById('u-type').innerText = u.trading_type;
-          document.getElementById('u-software').innerText = u.software_used;
-          document.getElementById('u-amount').innerText = '₹ ' + u.amount;
-          document.getElementById('u-mode').innerText = u.payment_mode;
-          document.getElementById('u-course').innerText = u.course_type;
-          
-          document.getElementById('u-scan_date').innerText = u.date || 'Never';
-          
-          if (u.created_at) {
-            document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', { 
-              timeZone: 'Asia/Kolkata', 
-              day: '2-digit', month: '2-digit', year: 'numeric', 
-              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
-            });
-          } else {
-            document.getElementById('u-created_at').innerText = 'N/A';
-          }
-          
-          const up = (i, url, p) => {
-            let img = document.getElementById(i);
-            if (url && url.length > 10) {
-              img.src = url;
-              img.parentElement.href = url;
-            } else {
-              img.src = p;
-              img.parentElement.href = "#";
-            }
-          };
-          up('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
-          up('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Payment");
-          up('u-aadhar_front', u.aadhar_front_image, "https://via.placeholder.com/150?text=No+Aadhar");
-          up('u-aadhar_back', u.aadhar_back_image, "https://via.placeholder.com/150?text=No+Aadhar");
-          
-          document.getElementById('statusMsg').innerText = "✅ Scan logged - Valid Entry Approved";
-          document.getElementById('statusMsg').style.color = "#00c853";
-          document.getElementById('statusMsg').style.background = "rgba(0,200,83,0.1)";
-          
-          checkFormStatus(id);
-          getScanCount(id);
-        } else {
-          document.getElementById('error-display').style.display = 'block';
-          document.getElementById('error-display').innerText = '❌ ' + (json.message || 'Invalid Barcode');
-          document.getElementById('statusMsg').innerText = "❌ Invalid Barcode";
-          document.getElementById('statusMsg').style.color = "#ff4444";
-          document.getElementById('statusMsg').style.background = "rgba(255,68,68,0.1)";
-        }
-      } catch (err) {
-        console.error('Scan error:', err);
-        document.getElementById('error-display').style.display = 'block';
-        document.getElementById('error-display').innerText = '❌ Network Error: ' + err.message;
-      }
-    }
+    async function getScanCount(userId) { try { const res = await fetch('/api/scan-count/' + userId); const json = await res.json(); document.getElementById('u-scan_count').innerText = json.success ? (json.count + ' time(s)') : '0 time(s)'; } catch(e) { document.getElementById('u-scan_count').innerText = 'Error'; } }
+    async function checkFormStatus(userId) { try { const res = await fetch('/api/form-responses/' + userId); const json = await res.json(); const box = document.getElementById('formStatusBox'); if (json.success && json.data) { box.className = 'form-status-box form-filled'; box.innerHTML = '✅ KYC Form Filled — ' + json.data.received_at_formatted; } else { box.className = 'form-status-box form-pending'; box.innerHTML = '⏳ KYC Form Not Yet Filled'; } } catch (e) { document.getElementById('formStatusBox').innerHTML = 'ℹ️ Status unavailable'; } }
+    checkFormStatus('${u.id}'); getScanCount('${u.id}');
+    input.addEventListener('keydown', async function(e) { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const id = input.value.trim(); input.value = ''; if (id) { window.history.pushState({}, "", "/user/" + id); await loadUserData(id); } } });
+    async function loadUserData(id) { try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode_id: id }) }); const json = await res.json(); if (json.success) { const u = json.data; document.getElementById('error-display').style.display = 'none'; document.getElementById('u-full_name').innerText = u.full_name; document.getElementById('u-email').innerText = u.email; document.getElementById('u-phone').innerText = u.phone; document.getElementById('u-dob').innerText = u.dob; document.getElementById('u-market').innerText = u.trading_market; document.getElementById('u-type').innerText = u.trading_type; document.getElementById('u-software').innerText = u.software_used; document.getElementById('u-amount').innerText = '₹ ' + u.amount; document.getElementById('u-mode').innerText = u.payment_mode; document.getElementById('u-course').innerText = u.course_type; document.getElementById('u-scan_date').innerText = u.date || 'Never'; if (u.created_at) { document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }); } else { document.getElementById('u-created_at').innerText = 'N/A'; } const up = (i, url, p) => { let img = document.getElementById(i); if (url && url.length > 10) { img.src = url; img.parentElement.href = url; } else { img.src = p; img.parentElement.href = "#"; } }; up('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie"); up('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Payment"); up('u-aadhar_front', u.aadhar_front_image, "https://via.placeholder.com/150?text=No+Aadhar"); up('u-aadhar_back', u.aadhar_back_image, "https://via.placeholder.com/150?text=No+Aadhar"); document.getElementById('statusMsg').innerText = "✅ Scan logged - Valid Entry Approved"; document.getElementById('statusMsg').style.color = "#00c853"; document.getElementById('statusMsg').style.background = "rgba(0,200,83,0.1)"; checkFormStatus(id); getScanCount(id); } else { document.getElementById('error-display').style.display = 'block'; document.getElementById('error-display').innerText = '❌ ' + (json.message || 'Invalid Barcode'); document.getElementById('statusMsg').innerText = "❌ Invalid Barcode"; document.getElementById('statusMsg').style.color = "#ff4444"; document.getElementById('statusMsg').style.background = "rgba(255,68,68,0.1)"; } } catch (err) { console.error('Scan error:', err); document.getElementById('error-display').style.display = 'block'; document.getElementById('error-display').innerText = '❌ Network Error: ' + err.message; } }
   </script>
 </body>
 </html>`); 
@@ -776,10 +631,7 @@ app.get("/user/:id", async (req, res) => {
 // ==================================================================================
 app.get("/api/scan-count/:barcode_id", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT COUNT(*) as count FROM scans WHERE barcode_id = $1", 
-      [req.params.barcode_id]
-    );
+    const result = await pool.query("SELECT COUNT(*) as count FROM scans WHERE barcode_id = $1", [req.params.barcode_id]);
     res.json({ success: true, count: result.rows[0].count });
   } catch (e) {
     console.error("Scan count error:", e);
@@ -793,11 +645,7 @@ app.get("/api/scan-count/:barcode_id", async (req, res) => {
 app.get("/api/scans", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT s.*, u.full_name, u.phone, u.course_type 
-       FROM scans s 
-       LEFT JOIN users u ON s.barcode_id = u.id 
-       ORDER BY s.scanned_at DESC 
-       LIMIT 100`
+      `SELECT s.*, u.full_name, u.phone, u.course_type FROM scans s LEFT JOIN users u ON s.barcode_id = u.id ORDER BY s.scanned_at DESC LIMIT 100`
     );
     res.json({ success: true, data: result.rows });
   } catch (e) {
@@ -810,40 +658,18 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
 // ==================================================================================
-// ✅ FIXED: DB INIT - Adds created_at column if missing on existing table
+// ✅ FIXED: DB INIT
 // ==================================================================================
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    // Create table if not exists (without created_at to avoid conflict)
     await client.query(`CREATE TABLE IF NOT EXISTS users (
-      id VARCHAR(7) PRIMARY KEY, 
-      full_name VARCHAR(255), 
-      address TEXT, 
-      email VARCHAR(255), 
-      phone VARCHAR(20), 
-      dob DATE, 
-      date VARCHAR(50), 
-      trading_market VARCHAR(100), 
-      trading_type VARCHAR(100), 
-      source VARCHAR(100), 
-      software_used VARCHAR(100), 
-      amount NUMERIC, 
-      payment_mode VARCHAR(50), 
-      selfie_image TEXT, 
-      payment_image TEXT, 
-      aadhar_back_image TEXT, 
-      aadhar_front_image TEXT, 
-      course_type VARCHAR(100)
+      id VARCHAR(7) PRIMARY KEY, full_name VARCHAR(255), address TEXT, email VARCHAR(255), phone VARCHAR(20), dob DATE, date VARCHAR(50), trading_market VARCHAR(100), trading_type VARCHAR(100), source VARCHAR(100), software_used VARCHAR(100), amount NUMERIC, payment_mode VARCHAR(50), selfie_image TEXT, payment_image TEXT, aadhar_back_image TEXT, aadhar_front_image TEXT, course_type VARCHAR(100)
     );`);
     
-    // ✅ FIX: Add created_at column to EXISTING table if it doesn't exist
     await client.query(`
-      DO $$       BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'users' AND column_name = 'created_at'
-        ) THEN
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'created_at') THEN
           ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
           UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;
           RAISE NOTICE '✅ created_at column added to users table';
@@ -854,24 +680,14 @@ async function initializeDatabase() {
     `);
     
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
-      id SERIAL PRIMARY KEY, 
-      barcode_id VARCHAR(7) NOT NULL, 
-      course_type VARCHAR(255), 
-      scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
-      device_info TEXT
+      id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255), scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT
     );`);
     
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (
-      id VARCHAR(7) PRIMARY KEY, 
-      ref_id VARCHAR(50), 
-      full_name VARCHAR(255), 
-      email VARCHAR(255), 
-      phone VARCHAR(20), 
-      raw_data JSONB, 
-      received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
     
-    console.log("✅ Node.js DB tables ready (created_at fix applied).");
+    console.log("✅ Node.js DB tables ready.");
   } catch (err) { 
     console.error("DB Init Error:", err); 
   } finally { 
