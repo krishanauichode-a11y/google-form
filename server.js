@@ -340,10 +340,31 @@ app.post("/create", async (req, res) => {
   }
 });
 
+// ==================================================================================
+// ✅ FIXED: SEND EMAIL - Embeds QR/Barcode image as inline attachment (CID)
+// ==================================================================================
 app.post("/send-email", async (req, res) => { 
   try { 
     const { id, email } = req.body; 
     const u = (await pool.query("SELECT * FROM users WHERE id=$1", [id])).rows[0]; 
+    
+    if (!u) return res.status(404).json({ error: "User not found" });
+    
+    // ✅ Get local image path
+    const finalImagePath = path.join(tempDir, `${id}-final.png`);
+    const qrImagePath = path.join(tempDir, `${id}-qr.png`);
+    const barcodeImagePath = path.join(tempDir, `${id}-barcode.png`);
+    
+    // ✅ Regenerate if image doesn't exist
+    if (!fs.existsSync(finalImagePath)) {
+      console.log(`🔄 Regenerating image for ${id}`);
+      await generateFinalImage(id);
+    }
+    
+    // ✅ Final check
+    if (!fs.existsSync(finalImagePath)) {
+      return res.status(500).json({ error: "Failed to generate image" });
+    }
     
     const t = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -353,20 +374,80 @@ app.post("/send-email", async (req, res) => {
       tls: { rejectUnauthorized: false }
     }); 
     
+    // ✅ Build attachments array
+    const attachments = [
+      {
+        filename: 'entry-pass.png',
+        path: finalImagePath,
+        cid: 'entrypass'
+      }
+    ];
+    
+    // Add QR code as downloadable attachment if exists
+    if (fs.existsSync(qrImagePath)) {
+      attachments.push({
+        filename: 'qr-code.png',
+        path: qrImagePath
+      });
+    }
+    
+    // Add barcode as downloadable attachment if exists
+    if (fs.existsSync(barcodeImagePath)) {
+      attachments.push({
+        filename: 'barcode.png',
+        path: barcodeImagePath
+      });
+    }
+    
     await t.sendMail({
       from: `"Tushar Bhumkar Institute" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: "🎟️ Your Entry Pass",
-      html: `<h2>Hello ${u.full_name},</h2><p>Your entry pass is ready.</p><img src="${await generateFinalImage(id)}" width="300"/>`
+      subject: "🎟️ Your Entry Pass - Tushar Bhumkar Institute",
+      html: `
+        <div style="text-align: center; font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9;">
+          <div style="max-width: 500px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #003366; margin-bottom: 10px;">Hello ${u.full_name},</h2>
+            <p style="color: #555; font-size: 16px; margin-bottom: 25px;">Your entry pass is ready. Please show this pass at the entry gate.</p>
+            
+            <div style="margin: 25px 0;">
+              <img src="cid:entrypass" width="280" style="max-width: 100%; height: auto; border: 1px solid #e0e0e0; border-radius: 8px;"/>
+            </div>
+            
+            <div style="background: #f0f7ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="color: #003366; font-size: 14px; margin: 0;">
+                <strong>📱 Instructions:</strong> Scan the QR code or Barcode at the entry gate
+              </p>
+            </div>
+            
+            <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px;">
+              <p style="color: #999; font-size: 12px; margin: 0;">
+                <strong>Your ID:</strong> ${u.id}<br/>
+                <strong>Course:</strong> ${u.course_type || 'N/A'}
+              </p>
+            </div>
+          </div>
+          
+          <p style="color: #aaa; font-size: 11px; margin-top: 25px;">
+            Tushar Bhumkar Institute | www.tusharbhumkar.com
+          </p>
+        </div>
+      `,
+      attachments: attachments
     }); 
     
+    console.log(`✅ Email with embedded image sent to ${email} for user ${id}`);
     res.json({ success: true }); 
+    
   } catch (e) {
     console.error("❌ EMAIL ERROR:", e.message);
+    console.error("❌ Full error:", e);
     res.status(500).json({ error: e.message }); 
   }
 });
 
+// ==================================================================================
+// ✅ SHARE VIA INTERAKT (WhatsApp)
+// ==================================================================================
 app.post("/share-interakt", async (req, res) => { 
   try { 
     const { id, phone } = req.body; 
@@ -635,10 +716,8 @@ app.get("/user/:id", async (req, res) => {
           document.getElementById('u-mode').innerText = u.payment_mode;
           document.getElementById('u-course').innerText = u.course_type;
           
-          // ✅ FIX: Show Kolkata time returned from server (already formatted)
           document.getElementById('u-scan_date').innerText = u.date || 'Never';
           
-          // ✅ FIX: Show created_at in Asia/Kolkata
           if (u.created_at) {
             document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', { 
               timeZone: 'Asia/Kolkata', 
@@ -759,7 +838,6 @@ async function initializeDatabase() {
     );`);
     
     // ✅ FIX: Add created_at column to EXISTING table if it doesn't exist
-    // CREATE TABLE IF NOT EXISTS won't add new columns, so we use ALTER TABLE
     await client.query(`
       DO $$       BEGIN
         IF NOT EXISTS (
@@ -767,7 +845,6 @@ async function initializeDatabase() {
           WHERE table_name = 'users' AND column_name = 'created_at'
         ) THEN
           ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-          -- Backfill any existing rows that have NULL created_at
           UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;
           RAISE NOTICE '✅ created_at column added to users table';
         ELSE
