@@ -75,7 +75,7 @@ app.get("/track", async (req, res) => {
     const googleFormUrl = `https://docs.google.com/forms/d/e/1FAIpQLSfoR4hQ7Tg0OTnUN8OeYKlyTzZGSR8T0hS61Brphe7Q-HRVYA/viewform`;
     console.log(`🔄 Step 4 saved to PHP DB via API for ${ref_id}`);
     return res.redirect(googleFormUrl);
-    
+
   } catch (err) {
     console.error("❌ TRACK ERROR:", err);
     res.status(500).send(`<h2 style="color:red; text-align:center; margin-top:50px;">Debug Error</h2><p style="text-align:center; font-family:monospace; background:#f3f4f6; padding:20px; max-width:600px; margin:20px auto; border-radius:8px;"><strong>Error Message:</strong><br>${err.message}</p>`);
@@ -88,10 +88,10 @@ app.get("/track", async (req, res) => {
 app.post("/webhook/google-form", async (req, res) => {
   try {
     const { ref_id } = req.body;
-    if (!ref_id) return res.status(400).json({ error: "Missing ref_id" });
-    
+    if (!ref_id) return res.status(400).json({ success: false, message: "Missing ref_id" });
+
     await pool.query(`INSERT INTO google_form_responses (id, ref_id, raw_data, received_at) VALUES ($1, $2, $3, NOW()) ON CONFLICT (id) DO NOTHING`, [generateShortId(), ref_id, JSON.stringify(req.body)]);
-    
+
     await fetch(PHP_SUPABASE_URL + '/rest/v1/client_pipeline', {
       method: 'POST',
       headers: {
@@ -105,12 +105,12 @@ app.post("/webhook/google-form", async (req, res) => {
         step_5_form_submitted_at: new Date().toISOString()
       })
     });
-    
+
     console.log(`✅ Step 5 saved to PHP DB via API for ref_id: ${ref_id}`);
     res.status(200).json({ success: true });
-  } catch (err) { 
+  } catch (err) {
     console.error("❌ WEBHOOK ERROR:", err);
-    res.status(500).json({ error: err.message }); 
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -120,29 +120,29 @@ app.post("/webhook/google-form", async (req, res) => {
 app.post("/api/find-ref-by-phone", async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: "Missing phone" });
-    
+    if (!phone) return res.status(400).json({ success: false, message: "Missing phone" });
+
     const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-    
+
     const response = await fetch(`${PHP_SUPABASE_URL}/rest/v1/customers?select=ref_id&mobile=ilike.%25${cleanPhone}%25&payment_status=eq.paid&order=paid_at.desc&limit=1`, {
       headers: {
         'apikey': PHP_SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${PHP_SUPABASE_ANON_KEY}`
       }
     });
-    
+
     const data = await response.json();
-    
+
     if (data.length > 0) {
       console.log(`✅ Found ref_id ${data[0].ref_id} for phone ${cleanPhone}`);
       res.json({ success: true, ref_id: data[0].ref_id });
     } else {
       console.log(`❌ No payment found for phone ${cleanPhone}`);
-      res.json({ success: false, error: "No matching payment found" });
+      res.json({ success: false, message: "No matching payment found" });
     }
   } catch (err) {
     console.error("Find Phone Error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -150,74 +150,92 @@ app.post("/api/find-ref-by-phone", async (req, res) => {
 // OTHER API ROUTES
 // ==================================================================================
 app.get("/api/pipeline/:ref_id", async (req, res) => {
-  try { 
-    const r = await pool.query(`SELECT * FROM client_pipeline WHERE ref_id = $1`, [req.params.ref_id]); 
-    res.json({ success: r.rows.length > 0, data: r.rows[0] || null }); 
+  try {
+    const r = await pool.query(`SELECT * FROM client_pipeline WHERE ref_id = $1`, [req.params.ref_id]);
+    res.json({ success: r.rows.length > 0, data: r.rows[0] || null });
   } catch (e) { res.json({ success: false }); }
 });
 
 app.get("/api/form-responses/:ref_id", async (req, res) => {
-  try { 
-    const r = await pool.query(`SELECT TO_CHAR(received_at, 'DD Mon YYYY, HH12:MI AM') as received_at_formatted FROM google_form_responses WHERE ref_id = $1 LIMIT 1`, [req.params.ref_id]); 
-    res.json({ success: r.rows.length > 0, data: r.rows[0] || null }); 
+  try {
+    const r = await pool.query(`SELECT TO_CHAR(received_at, 'DD Mon YYYY, HH12:MI AM') as received_at_formatted FROM google_form_responses WHERE ref_id = $1 LIMIT 1`, [req.params.ref_id]);
+    res.json({ success: r.rows.length > 0, data: r.rows[0] || null });
   } catch (e) { res.json({ success: false }); }
 });
 
-app.get("/api/user/:id", async (req, res) => { 
-  try { 
-    const r = await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id]); 
-    res.json(r.rows.length===0?{success:false}:{success:true,data:r.rows[0]}); 
-  } catch(e){res.json({success:false});}
+app.get("/api/user/:id", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id]);
+    res.json(r.rows.length === 0 ? { success: false } : { success: true, data: r.rows[0] });
+  } catch (e) { res.json({ success: false }); }
 });
 
 // ==================================================================================
-// ✅ FIXED: SCAN ENDPOINT - Asia/Kolkata live time in users.date + scans table
+// ✅ FIXED: SCAN ENDPOINT - Strips scanner garbage chars + consistent 'message' key
 // ==================================================================================
-app.post("/api/scan", async (req, res) => { 
-  try { 
-    const { barcode_id } = req.body; 
-    console.log("🔍 Scan request received for:", barcode_id);
-    
+app.post("/api/scan", async (req, res) => {
+  try {
+    let { barcode_id } = req.body;
+    console.log("🔍 Raw scan input:", JSON.stringify(barcode_id), "| Type:", typeof barcode_id, "| Length:", barcode_id?.length);
+
+    // STEP 1: Ensure string type (some scanners send numbers)
+    barcode_id = String(barcode_id || "");
+
+    // STEP 2: Strip ALL non-alphanumeric characters
+    // This removes: STX (0x02), ETX (0x03), CR (\r), LF (\n), TAB, spaces, etc.
+    barcode_id = barcode_id.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+
+    console.log("🧹 Cleaned barcode:", JSON.stringify(barcode_id), "| Length:", barcode_id.length);
+
+    // STEP 3: Validate format
     if (!barcode_id || barcode_id.length !== 7) {
-      console.log("❌ Invalid barcode format:", barcode_id);
-      return res.status(400).json({ success: false, message: "Invalid ID" }); 
+      console.log("❌ Invalid barcode format after cleaning. Got length:", barcode_id.length, "Value:", JSON.stringify(barcode_id));
+      return res.status(400).json({
+        success: false,
+        message: `Invalid format (need 7 chars, got ${barcode_id ? barcode_id.length : 0})`
+      });
     }
-    
-    const ur = await pool.query("SELECT * FROM users WHERE id=$1", [barcode_id]); 
+
+    // STEP 4: Find user
+    const ur = await pool.query("SELECT * FROM users WHERE id=$1", [barcode_id]);
     if (ur.rows.length === 0) {
-      console.log("❌ User not found for barcode:", barcode_id);
-      return res.json({ success: false, message: "Not found" }); 
+      console.log("❌ User not found in database for barcode:", barcode_id);
+      return res.json({ success: false, message: "ID not found in database" });
     }
-    
-    const u = ur.rows[0]; 
+
+    const u = ur.rows[0];
     console.log("✅ User found:", u.full_name, "| Course:", u.course_type);
-    
+
+    // STEP 5: Get Kolkata time
     const kolkataTime = await pool.query(
       `SELECT TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 'DD/MM/YYYY, HH12:MI:SS AM') AS kolkata_now`
     );
     const kolkataTimeString = kolkataTime.rows[0].kolkata_now;
     console.log("🕐 Kolkata time:", kolkataTimeString);
-    
-    const updateResult = await pool.query(`UPDATE users SET date = $1 WHERE id = $2`, [kolkataTimeString, barcode_id]); 
-    console.log("✅ Users.date updated with Kolkata time, rows:", updateResult.rowCount);
-    
+
+    // STEP 6: Update user scan date
+    const updateResult = await pool.query(`UPDATE users SET date = $1 WHERE id = $2`, [kolkataTimeString, barcode_id]);
+    console.log("✅ Users.date updated, rows affected:", updateResult.rowCount);
+
+    // STEP 7: Log scan to scans table
     const courseType = u.course_type || 'Unknown';
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
-    
+
     const insertResult = await pool.query(
-      `INSERT INTO scans (barcode_id, course_type, device_info, scanned_at) 
-       VALUES ($1, $2, $3, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')) 
-       RETURNING id, scanned_at`, 
+      `INSERT INTO scans (barcode_id, course_type, device_info, scanned_at)
+       VALUES ($1, $2, $3, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))
+       RETURNING id, scanned_at`,
       [barcode_id, courseType, deviceInfo]
-    ); 
-    console.log("✅ Scan recorded - ID:", insertResult.rows[0]?.id, "at:", insertResult.rows[0]?.scanned_at);
-    
+    );
+    console.log("✅ Scan recorded - Scan ID:", insertResult.rows[0]?.id, "at:", insertResult.rows[0]?.scanned_at);
+
+    // STEP 8: Return success
     const returnData = { ...u, date: kolkataTimeString };
-    res.json({ success: true, data: returnData, scan_id: insertResult.rows[0]?.id }); 
-    
+    res.json({ success: true, data: returnData, scan_id: insertResult.rows[0]?.id });
+
   } catch (e) {
-    console.error("❌ SCAN ERROR:", e.message);
-    res.status(500).json({ success: false, error: e.message }); 
+    console.error("❌ SCAN ERROR:", e.message, "\nStack:", e.stack);
+    res.status(500).json({ success: false, message: "Server error: " + e.message });
   }
 });
 
@@ -229,32 +247,32 @@ async function generateFinalImage(id) {
     const qrPath = path.join(tempDir, `${id}-qr.png`);
     const barPath = path.join(tempDir, `${id}-barcode.png`);
     const logoPath = path.join(__dirname, 'logo.png');
-    
-    if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) throw new Error("Missing files");
-    
+
+    if (!fs.existsSync(qrPath) || !fs.existsSync(barPath)) throw new Error("Missing QR or Barcode file for " + id);
+
     const qrImage = await loadImage(qrPath);
     const barcodeImg = await loadImage(barPath);
     let logo;
     if (fs.existsSync(logoPath)) logo = await loadImage(logoPath);
-    
+
     const scale = 2;
     const canvas = createCanvas(700 * scale, 900 * scale);
     const ctx = canvas.getContext("2d");
     ctx.scale(scale, scale);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    
+
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, 700, 900);
-    
+
     const p = "#003366";
     ctx.lineWidth = 20;
     ctx.strokeStyle = p;
     ctx.strokeRect(10, 10, 680, 880);
-    
+
     const cX = 350;
     let cY = 40;
-    
+
     if (logo) {
       const sf = Math.min(500 / logo.width, 300 / logo.height);
       const dw = logo.width * sf;
@@ -262,13 +280,13 @@ async function generateFinalImage(id) {
       ctx.drawImage(logo, cX - (dw / 2), cY, dw, dh);
       cY += dh + 15;
     }
-    
+
     ctx.textAlign = "center";
     ctx.fillStyle = p;
     ctx.font = "bold 20px Arial";
     ctx.fillText("www.tusharbhumkar.com", cX, cY);
     cY += 30;
-    
+
     ctx.beginPath();
     ctx.moveTo(50, cY);
     ctx.lineTo(650, cY);
@@ -276,22 +294,22 @@ async function generateFinalImage(id) {
     ctx.strokeStyle = "#e0e0e0";
     ctx.stroke();
     cY += 70;
-    
+
     ctx.fillStyle = p;
     ctx.font = "bold 50px Arial";
     ctx.fillText("ENTRY PASS", cX, cY);
     cY += 50;
-    
+
     const qs = 320;
     ctx.drawImage(qrImage, cX - (qs / 2), cY, qs, qs);
-    
+
     const bY = cY + qs + 25;
     ctx.drawImage(barcodeImg, 50, bY, 600, 100);
-    
+
     ctx.fillStyle = "#000";
     ctx.font = "italic 20px Arial";
     ctx.fillText("Scan QR or Barcode at Entry", cX, bY + 130);
-    
+
     const fp = path.join(tempDir, `${id}-final.png`);
     fs.writeFileSync(fp, canvas.toBuffer("image/png", { compressionLevel: 9 }));
     return `https://google-form-kebh.onrender.com/temp/${id}-final.png`;
@@ -304,71 +322,71 @@ async function generateFinalImage(id) {
 // ==================================================================================
 // ✅ FIXED: CREATE - Explicitly inserts created_at with Asia/Kolkata time
 // ==================================================================================
-app.post("/create", async (req, res) => { 
-  try { 
-    const { fullName, address, email, phone, dob, date, tradingMarket, tradingType, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType } = req.body; 
-    const id = generateShortId(); 
-    
+app.post("/create", async (req, res) => {
+  try {
+    const { fullName, address, email, phone, dob, date, tradingMarket, tradingType, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType } = req.body;
+    const id = generateShortId();
+
     await pool.query(
-      `INSERT INTO users(id, full_name, address, email, phone, dob, date, trading_market, trading_type, source, software_used, amount, payment_mode, selfie_image, payment_image, aadhar_front_image, aadhar_back_image, course_type, created_at) 
-       VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`, 
+      `INSERT INTO users(id, full_name, address, email, phone, dob, date, trading_market, trading_type, source, software_used, amount, payment_mode, selfie_image, payment_image, aadhar_front_image, aadhar_back_image, course_type, created_at)
+       VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`,
       [id, fullName, address, email, phone, dob, date, tradingMarket, tradingType, null, softwareUsed, amount, paymentMode, selfieImage, paymentImage, aadharFrontImage, aadharBackImage, courseType]
-    ); 
-    
-    fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), await QRCode.toBuffer(`https://google-form-kebh.onrender.com/user/${id}`, { width: 600, margin: 2, errorCorrectionLevel: 'H' })); 
-    fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 })); 
-    await generateFinalImage(id); 
-    
+    );
+
+    fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), await QRCode.toBuffer(`https://google-form-kebh.onrender.com/user/${id}`, { width: 600, margin: 2, errorCorrectionLevel: 'H' }));
+    fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 }));
+    await generateFinalImage(id);
+
     console.log("✅ User created:", id, fullName, "| created_at set to Asia/Kolkata time");
-    res.json({ success: true, id }); 
+    res.json({ success: true, id });
   } catch (e) {
     console.error("❌ CREATE ERROR:", e.message);
-    res.status(500).json({ error: e.message }); 
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
 // ==================================================================================
-// ✅ ULTIMATE FIX: SEND EMAIL - Anti-Spam + Embedded Image Buffer + Auto-Regen
+// ✅ FIXED: SEND EMAIL - Anti-Spam + Embedded Image Buffer + Auto-Regen
 // ==================================================================================
-app.post("/send-email", async (req, res) => { 
-  try { 
-    const { id, email } = req.body; 
-    const u = (await pool.query("SELECT * FROM users WHERE id=$1", [id])).rows[0]; 
-    
-    if (!u) return res.status(404).json({ error: "User not found" });
-    
+app.post("/send-email", async (req, res) => {
+  try {
+    const { id, email } = req.body;
+    const u = (await pool.query("SELECT * FROM users WHERE id=$1", [id])).rows[0];
+
+    if (!u) return res.status(404).json({ success: false, message: "User not found" });
+
     // 1. Get all required image paths
     const finalImagePath = path.join(tempDir, `${id}-final.png`);
     const qrImagePath = path.join(tempDir, `${id}-qr.png`);
     const barcodeImagePath = path.join(tempDir, `${id}-barcode.png`);
-    
+
     // 2. Auto-regenerate if Render cleared the temp directory
     if (!fs.existsSync(finalImagePath) || !fs.existsSync(qrImagePath) || !fs.existsSync(barcodeImagePath)) {
       console.log(`🔄 Regenerating missing images for ${id}...`);
-      
+
       if (!fs.existsSync(qrImagePath)) {
         const qrBuffer = await QRCode.toBuffer(`https://google-form-kebh.onrender.com/user/${id}`, { width: 600, margin: 2, errorCorrectionLevel: 'H' });
         fs.writeFileSync(qrImagePath, qrBuffer);
       }
-      
+
       if (!fs.existsSync(barcodeImagePath)) {
         const barBuffer = await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 });
         fs.writeFileSync(barcodeImagePath, barBuffer);
       }
-      
+
       await generateFinalImage(id);
     }
-    
+
     // 3. Final verification
     if (!fs.existsSync(finalImagePath)) {
       console.error(`❌ Critical: Failed to generate image for ${id}`);
-      return res.status(500).json({ error: "Failed to generate entry pass image" });
+      return res.status(500).json({ success: false, message: "Failed to generate entry pass image" });
     }
-    
-    // 4. Read file into memory buffer (more reliable than passing path)
+
+    // 4. Read file into memory buffer
     const imageBuffer = fs.readFileSync(finalImagePath);
     console.log(`✅ Image loaded into memory: ${(imageBuffer.length / 1024).toFixed(2)} KB`);
-    
+
     // 5. Create transporter
     const t = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -376,23 +394,16 @@ app.post("/send-email", async (req, res) => {
       secure: false,
       auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
       tls: { rejectUnauthorized: false }
-    }); 
-    
-    // 6. Send email with strict anti-spam properties
+    });
+
+    // 6. Send email
     const mailResult = await t.sendMail({
-      from: process.env.EMAIL_USER, // Simple 'from' avoids spam triggers
+      from: process.env.EMAIL_USER,
       to: email,
       replyTo: process.env.EMAIL_USER,
-      
-      // Clean subject without emojis
       subject: `Your Entry Pass - ${u.full_name} - ID: ${id}`,
-      
-      // CRITICAL: Plain text version prevents spam classification
       text: `Hello ${u.full_name},\n\nYour entry pass is ready!\n\nYour ID: ${id}\nCourse: ${u.course_type || 'N/A'}\n\nPlease show this pass at the entry gate.\n\n- Tushar Bhumkar Institute\nwww.tusharbhumkar.com`,
-      
-      // HTML version with table layout (best for email clients)
-      html: `
-<!DOCTYPE html>
+      html: `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -441,19 +452,15 @@ app.post("/send-email", async (req, res) => {
   </table>
 </body>
 </html>`,
-      
-      // Embed image directly from buffer
       attachments: [
         {
           filename: 'entry-pass.png',
-          content: imageBuffer, 
+          content: imageBuffer,
           contentType: 'image/png',
-          contentDisposition: 'inline', 
-          cid: 'entrypass' 
+          contentDisposition: 'inline',
+          cid: 'entrypass'
         }
       ],
-      
-      // Extra headers to avoid spam folder
       headers: {
         'X-Priority': '1',
         'X-MS-Priority': 'High',
@@ -461,28 +468,28 @@ app.post("/send-email", async (req, res) => {
         'X-Mailer': 'TusharBhumkarInstitute/1.0',
         'List-Unsubscribe': `<mailto:${process.env.EMAIL_USER}?subject=unsubscribe>`
       }
-    }); 
-    
+    });
+
     console.log(`✅ Email sent successfully to ${email} | ID: ${mailResult.messageId}`);
-    res.json({ success: true, messageId: mailResult.messageId }); 
-    
+    res.json({ success: true, messageId: mailResult.messageId });
+
   } catch (e) {
     console.error("❌ EMAIL ERROR:", e.message);
-    res.status(500).json({ error: e.message }); 
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
 // ==================================================================================
 // ✅ SHARE VIA INTERAKT (WhatsApp)
 // ==================================================================================
-app.post("/share-interakt", async (req, res) => { 
-  try { 
-    const { id, phone } = req.body; 
-    const cp = phone.replace(/\D/g, "").slice(-10); 
-    const u = (await pool.query("SELECT * FROM users WHERE id=$1", [id])).rows[0]; 
-    
-    if (!u) return res.json({ success: false }); 
-    
+app.post("/share-interakt", async (req, res) => {
+  try {
+    const { id, phone } = req.body;
+    const cp = phone.replace(/\D/g, "").slice(-10);
+    const u = (await pool.query("SELECT * FROM users WHERE id=$1", [id])).rows[0];
+
+    if (!u) return res.json({ success: false, message: "User not found" });
+
     const r = await fetch("https://api.interakt.ai/v1/public/message/", {
       method: "POST",
       headers: {
@@ -500,38 +507,38 @@ app.post("/share-interakt", async (req, res) => {
           headerValues: [`https://google-form-kebh.onrender.com/temp/${id}-final.png`]
         }
       })
-    }); 
-    
-    res.json({ success: true, data: await r.json() }); 
+    });
+
+    res.json({ success: true, data: await r.json() });
   } catch (e) {
     console.error("❌ INTERAKT ERROR:", e.message);
-    res.status(500).json({ error: e.message }); 
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
 // ==================================================================================
 // ADMIN & USER VIEW
 // ==================================================================================
-function checkAdmin(req, res) { 
-  if (req.session.isAdmin) return true; 
+function checkAdmin(req, res) {
+  if (req.session.isAdmin) return true;
   if (req.query.p === process.env.ADMIN_PASS) {
     req.session.isAdmin = true;
     return true;
-  } 
-  res.send(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><form method="GET" style="text-align:center;"><h2>🔒 Admin Access</h2><input type="password" name="p" placeholder="Enter Password" required style="padding:10px"/><br><br><button type="submit" style="padding:10px 20px">Access</button></form></body></html>`); 
-  return false; 
+  }
+  res.send(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><form method="GET" style="text-align:center;"><h2>🔒 Admin Access</h2><input type="password" name="p" placeholder="Enter Password" required style="padding:10px"/><br><br><button type="submit" style="padding:10px 20px">Access</button></form></body></html>`);
+  return false;
 }
 
-app.get("/user/:id", async (req, res) => { 
-  try { 
-    if (!checkAdmin(req, res)) return; 
-    const u = (await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id])).rows[0]; 
-    if (!u) return res.send("<h2>❌ Invalid QR</h2>"); 
-    const gi = (url) => url || "https://via.placeholder.com/150?text=No+Image"; 
-    
+app.get("/user/:id", async (req, res) => {
+  try {
+    if (!checkAdmin(req, res)) return;
+    const u = (await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id])).rows[0];
+    if (!u) return res.send("<h2>❌ Invalid QR</h2>");
+    const gi = (url) => url || "https://via.placeholder.com/150?text=No+Image";
+
     const createdAtDisplay = u.created_at ? new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'N/A';
     const scanDateDisplay = u.date || 'Never';
-    
+
     res.send(`<!DOCTYPE html>
 <html>
 <head>
@@ -612,14 +619,133 @@ app.get("/user/:id", async (req, res) => {
   <script>
     const input = document.getElementById('scanInput');
     setInterval(() => { if (document.activeElement !== input) input.focus(); }, 100);
-    async function getScanCount(userId) { try { const res = await fetch('/api/scan-count/' + userId); const json = await res.json(); document.getElementById('u-scan_count').innerText = json.success ? (json.count + ' time(s)') : '0 time(s)'; } catch(e) { document.getElementById('u-scan_count').innerText = 'Error'; } }
-    async function checkFormStatus(userId) { try { const res = await fetch('/api/form-responses/' + userId); const json = await res.json(); const box = document.getElementById('formStatusBox'); if (json.success && json.data) { box.className = 'form-status-box form-filled'; box.innerHTML = '✅ KYC Form Filled — ' + json.data.received_at_formatted; } else { box.className = 'form-status-box form-pending'; box.innerHTML = '⏳ KYC Form Not Yet Filled'; } } catch (e) { document.getElementById('formStatusBox').innerHTML = 'ℹ️ Status unavailable'; } }
-    checkFormStatus('${u.id}'); getScanCount('${u.id}');
-    input.addEventListener('keydown', async function(e) { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const id = input.value.trim(); input.value = ''; if (id) { window.history.pushState({}, "", "/user/" + id); await loadUserData(id); } } });
-    async function loadUserData(id) { try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode_id: id }) }); const json = await res.json(); if (json.success) { const u = json.data; document.getElementById('error-display').style.display = 'none'; document.getElementById('u-full_name').innerText = u.full_name; document.getElementById('u-email').innerText = u.email; document.getElementById('u-phone').innerText = u.phone; document.getElementById('u-dob').innerText = u.dob; document.getElementById('u-market').innerText = u.trading_market; document.getElementById('u-type').innerText = u.trading_type; document.getElementById('u-software').innerText = u.software_used; document.getElementById('u-amount').innerText = '₹ ' + u.amount; document.getElementById('u-mode').innerText = u.payment_mode; document.getElementById('u-course').innerText = u.course_type; document.getElementById('u-scan_date').innerText = u.date || 'Never'; if (u.created_at) { document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }); } else { document.getElementById('u-created_at').innerText = 'N/A'; } const up = (i, url, p) => { let img = document.getElementById(i); if (url && url.length > 10) { img.src = url; img.parentElement.href = url; } else { img.src = p; img.parentElement.href = "#"; } }; up('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie"); up('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Payment"); up('u-aadhar_front', u.aadhar_front_image, "https://via.placeholder.com/150?text=No+Aadhar"); up('u-aadhar_back', u.aadhar_back_image, "https://via.placeholder.com/150?text=No+Aadhar"); document.getElementById('statusMsg').innerText = "✅ Scan logged - Valid Entry Approved"; document.getElementById('statusMsg').style.color = "#00c853"; document.getElementById('statusMsg').style.background = "rgba(0,200,83,0.1)"; checkFormStatus(id); getScanCount(id); } else { document.getElementById('error-display').style.display = 'block'; document.getElementById('error-display').innerText = '❌ ' + (json.message || 'Invalid Barcode'); document.getElementById('statusMsg').innerText = "❌ Invalid Barcode"; document.getElementById('statusMsg').style.color = "#ff4444"; document.getElementById('statusMsg').style.background = "rgba(255,68,68,0.1)"; } } catch (err) { console.error('Scan error:', err); document.getElementById('error-display').style.display = 'block'; document.getElementById('error-display').innerText = '❌ Network Error: ' + err.message; } }
+
+    async function getScanCount(userId) {
+      try {
+        const res = await fetch('/api/scan-count/' + userId);
+        const json = await res.json();
+        document.getElementById('u-scan_count').innerText = json.success ? (json.count + ' time(s)') : '0 time(s)';
+      } catch(e) {
+        document.getElementById('u-scan_count').innerText = 'Error';
+      }
+    }
+
+    async function checkFormStatus(userId) {
+      try {
+        const res = await fetch('/api/form-responses/' + userId);
+        const json = await res.json();
+        const box = document.getElementById('formStatusBox');
+        if (json.success && json.data) {
+          box.className = 'form-status-box form-filled';
+          box.innerHTML = '✅ KYC Form Filled — ' + json.data.received_at_formatted;
+        } else {
+          box.className = 'form-status-box form-pending';
+          box.innerHTML = '⏳ KYC Form Not Yet Filled';
+        }
+      } catch (e) {
+        document.getElementById('formStatusBox').innerHTML = 'ℹ️ Status unavailable';
+      }
+    }
+
+    checkFormStatus('${u.id}');
+    getScanCount('${u.id}');
+
+    input.addEventListener('keydown', async function(e) {
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        let id = input.value;
+        input.value = '';
+
+        if (id) {
+          // ✅ FIX: Strip all non-alphanumeric characters before sending
+          id = id.replace(/[^A-Za-z0-9]/g, '').toUpperCase().trim();
+
+          if (id.length === 7) {
+            window.history.pushState({}, "", "/user/" + id);
+            await loadUserData(id);
+          } else {
+            document.getElementById('error-display').style.display = 'block';
+            document.getElementById('error-display').innerText = '❌ Invalid barcode length (' + id.length + ' chars). Need exactly 7.';
+            document.getElementById('statusMsg').innerText = "❌ Invalid Barcode";
+            document.getElementById('statusMsg').style.color = "#ff4444";
+            document.getElementById('statusMsg').style.background = "rgba(255,68,68,0.1)";
+          }
+        }
+      }
+    });
+
+    async function loadUserData(id) {
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ barcode_id: id })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          const u = json.data;
+          document.getElementById('error-display').style.display = 'none';
+          document.getElementById('u-full_name').innerText = u.full_name;
+          document.getElementById('u-email').innerText = u.email;
+          document.getElementById('u-phone').innerText = u.phone;
+          document.getElementById('u-dob').innerText = u.dob;
+          document.getElementById('u-market').innerText = u.trading_market;
+          document.getElementById('u-type').innerText = u.trading_type;
+          document.getElementById('u-software').innerText = u.software_used;
+          document.getElementById('u-amount').innerText = '₹ ' + u.amount;
+          document.getElementById('u-mode').innerText = u.payment_mode;
+          document.getElementById('u-course').innerText = u.course_type;
+          document.getElementById('u-scan_date').innerText = u.date || 'Never';
+
+          if (u.created_at) {
+            document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              day: '2-digit', month: '2-digit', year: 'numeric',
+              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+            });
+          } else {
+            document.getElementById('u-created_at').innerText = 'N/A';
+          }
+
+          const up = (i, url, p) => {
+            let img = document.getElementById(i);
+            if (url && url.length > 10) {
+              img.src = url;
+              img.parentElement.href = url;
+            } else {
+              img.src = p;
+              img.parentElement.href = "#";
+            }
+          };
+          up('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
+          up('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Payment");
+          up('u-aadhar_front', u.aadhar_front_image, "https://via.placeholder.com/150?text=No+Aadhar");
+          up('u-aadhar_back', u.aadhar_back_image, "https://via.placeholder.com/150?text=No+Aadhar");
+
+          document.getElementById('statusMsg').innerText = "✅ Scan logged - Valid Entry Approved";
+          document.getElementById('statusMsg').style.color = "#00c853";
+          document.getElementById('statusMsg').style.background = "rgba(0,200,83,0.1)";
+          checkFormStatus(id);
+          getScanCount(id);
+
+        } else {
+          document.getElementById('error-display').style.display = 'block';
+          // ✅ FIX: Check both 'message' and 'error' keys
+          document.getElementById('error-display').innerText = '❌ ' + (json.message || json.error || 'Invalid Barcode');
+          document.getElementById('statusMsg').innerText = "❌ " + (json.message || json.error || 'Invalid Barcode');
+          document.getElementById('statusMsg').style.color = "#ff4444";
+          document.getElementById('statusMsg').style.background = "rgba(255,68,68,0.1)";
+        }
+      } catch (err) {
+        console.error('Scan error:', err);
+        document.getElementById('error-display').style.display = 'block';
+        document.getElementById('error-display').innerText = '❌ Network Error: ' + err.message;
+      }
+    }
   </script>
 </body>
-</html>`); 
+</html>`);
   } catch (e) {
     console.error("User page error:", e);
     res.send("Error loading user");
@@ -650,7 +776,7 @@ app.get("/api/scans", async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (e) {
     console.error("Scans list error:", e);
-    res.status(500).json({ success: false, error: e.message });
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
@@ -666,7 +792,7 @@ async function initializeDatabase() {
     await client.query(`CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(7) PRIMARY KEY, full_name VARCHAR(255), address TEXT, email VARCHAR(255), phone VARCHAR(20), dob DATE, date VARCHAR(50), trading_market VARCHAR(100), trading_type VARCHAR(100), source VARCHAR(100), software_used VARCHAR(100), amount NUMERIC, payment_mode VARCHAR(50), selfie_image TEXT, payment_image TEXT, aadhar_back_image TEXT, aadhar_front_image TEXT, course_type VARCHAR(100)
     );`);
-    
+
     await client.query(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'created_at') THEN
@@ -678,20 +804,20 @@ async function initializeDatabase() {
         END IF;
       END $$;
     `);
-    
+
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
       id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255), scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT
     );`);
-    
+
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (
       id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
-    
+
     console.log("✅ Node.js DB tables ready.");
-  } catch (err) { 
-    console.error("DB Init Error:", err); 
-  } finally { 
-    client.release(); 
+  } catch (err) {
+    console.error("DB Init Error:", err);
+  } finally {
+    client.release();
   }
 }
 
