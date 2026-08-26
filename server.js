@@ -1044,13 +1044,12 @@ app.get("/join", async (req, res) => {
         <div class="msg-box" id="msgBox"></div>
         <div class="helper">
           <p>📋 Your Entry Pass ID is the 7-character code<br>below the barcode on your pass image</p>
-          <p style="margin-top:8px;">Don't have your ID? <a href="https://tusharbhumkar.com" target="_blank">Contact Admin</a></p>
+          <p style="margin-top:8px;"><a href="tel:+919156709542" style="color:#448aff;text-decoration:none;">📞 Contact Admin</a></p>
+          
         </div>
       </div>
     </div>
-  <div class="footer">
-  <p style="margin-top:4px;"><a href="tel:+919156709542" style="color:#448aff;text-decoration:none;">📞 Call Support: +91 9156709542</a></p>
-</div>
+  <div class="footer"><p>www.tusharbhumkar.com</p></div>
   </div>
   <script>
     var idInput = document.getElementById('idInput');
