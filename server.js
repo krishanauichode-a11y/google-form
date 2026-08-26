@@ -1048,9 +1048,8 @@ app.get("/join", async (req, res) => {
         </div>
       </div>
     </div>
-   <div class="footer">
-  <p>www.tusharbhumkar.com</p>
-  <p style="margin-top:4px;">📞 Support: +91 98765 43210</p>
+  <div class="footer">
+  <p style="margin-top:4px;"><a href="tel:+919156709542" style="color:#448aff;text-decoration:none;">📞 Call Support: +91 9156709542</a></p>
 </div>
   </div>
   <script>
