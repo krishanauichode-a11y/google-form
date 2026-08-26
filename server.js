@@ -1048,7 +1048,10 @@ app.get("/join", async (req, res) => {
         </div>
       </div>
     </div>
-    <div class="footer"><p>www.tusharbhumkar.com</p></div>
+   <div class="footer">
+  <p>www.tusharbhumkar.com</p>
+  <p style="margin-top:4px;">📞 Support: +91 98765 43210</p>
+</div>
   </div>
   <script>
     var idInput = document.getElementById('idInput');
