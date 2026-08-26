@@ -171,22 +171,18 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ FIXED: SCAN ENDPOINT - Now accepts batch_name, stores in scans table + users.date
+// ✅ SCAN ENDPOINT - With batch_name support, updates users.date same as before
 // ==================================================================================
 app.post("/api/scan", async (req, res) => {
   try {
     let { barcode_id, batch_name } = req.body;
     console.log("🔍 Raw scan input:", JSON.stringify(barcode_id), "| Type:", typeof barcode_id, "| Length:", barcode_id?.length, "| Batch:", batch_name || "none");
 
-    // STEP 1: Ensure string type (some scanners send numbers)
     barcode_id = String(barcode_id || "");
-
-    // STEP 2: Strip ALL non-alphanumeric characters
     barcode_id = barcode_id.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
     console.log("🧹 Cleaned barcode:", JSON.stringify(barcode_id), "| Length:", barcode_id.length);
 
-    // STEP 3: Validate format
     if (!barcode_id || barcode_id.length !== 7) {
       console.log("❌ Invalid barcode format after cleaning. Got length:", barcode_id.length, "Value:", JSON.stringify(barcode_id));
       return res.status(400).json({
@@ -195,7 +191,6 @@ app.post("/api/scan", async (req, res) => {
       });
     }
 
-    // STEP 4: Find user
     const ur = await pool.query("SELECT * FROM users WHERE id=$1", [barcode_id]);
     if (ur.rows.length === 0) {
       console.log("❌ User not found in database for barcode:", barcode_id);
@@ -205,18 +200,15 @@ app.post("/api/scan", async (req, res) => {
     const u = ur.rows[0];
     console.log("✅ User found:", u.full_name, "| Course:", u.course_type);
 
-    // STEP 5: Get Kolkata time
     const kolkataTime = await pool.query(
       `SELECT TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 'DD/MM/YYYY, HH12:MI:SS AM') AS kolkata_now`
     );
     const kolkataTimeString = kolkataTime.rows[0].kolkata_now;
     console.log("🕐 Kolkata time:", kolkataTimeString);
 
-    // STEP 6: Update user scan date in users table
     const updateResult = await pool.query(`UPDATE users SET date = $1 WHERE id = $2`, [kolkataTimeString, barcode_id]);
     console.log("✅ Users.date updated, rows affected:", updateResult.rowCount);
 
-    // STEP 7: Log scan to scans table WITH batch_name
     const courseType = u.course_type || 'Unknown';
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
     const batchLabel = batch_name || null;
@@ -229,7 +221,6 @@ app.post("/api/scan", async (req, res) => {
     );
     console.log("✅ Scan recorded - Scan ID:", insertResult.rows[0]?.id, "| Batch:", batchLabel || "none", "| at:", insertResult.rows[0]?.scanned_at);
 
-    // STEP 8: Return success
     const returnData = { ...u, date: kolkataTimeString };
     res.json({ success: true, data: returnData, scan_id: insertResult.rows[0]?.id });
 
@@ -320,7 +311,7 @@ async function generateFinalImage(id) {
 }
 
 // ==================================================================================
-// ✅ FIXED: CREATE - Explicitly inserts created_at with Asia/Kolkata time
+// ✅ CREATE - Explicitly inserts created_at with Asia/Kolkata time
 // ==================================================================================
 app.post("/create", async (req, res) => {
   try {
@@ -346,7 +337,7 @@ app.post("/create", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ FIXED: SEND EMAIL - Anti-Spam + Embedded Image Buffer + Auto-Regen
+// ✅ SEND EMAIL - Anti-Spam + Embedded Image Buffer + Auto-Regen
 // ==================================================================================
 app.post("/send-email", async (req, res) => {
   try {
@@ -511,7 +502,7 @@ app.post("/share-interakt", async (req, res) => {
 });
 
 // ==================================================================================
-// ADMIN & USER VIEW
+// ADMIN CHECK
 // ==================================================================================
 function checkAdmin(req, res) {
   if (req.session.isAdmin) return true;
@@ -523,6 +514,9 @@ function checkAdmin(req, res) {
   return false;
 }
 
+// ==================================================================================
+// USER VIEW PAGE
+// ==================================================================================
 app.get("/user/:id", async (req, res) => {
   try {
     if (!checkAdmin(req, res)) return;
@@ -758,7 +752,7 @@ app.get("/api/scan-count/:barcode_id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ GET ALL SCANS (Admin) - Now includes batch_name
+// ✅ GET ALL SCANS (Admin)
 // ==================================================================================
 app.get("/api/scans", async (req, res) => {
   try {
@@ -788,7 +782,6 @@ app.get("/attendance", async (req, res) => {
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'Inter',sans-serif; background:#0a0a0a; color:#e5e5e5; min-height:100vh; }
-
     .header { background:linear-gradient(135deg,#1a1a2e,#16213e); padding:20px 30px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; }
     .header h1 { font-size:22px; font-weight:700; }
     .header h1 span { color:#00e676; }
@@ -799,7 +792,6 @@ app.get("/attendance", async (req, res) => {
     .stat-box.green .num { color:#00e676; }
     .stat-box.red .num { color:#ff5252; }
     .stat-box.blue .num { color:#448aff; }
-
     .batch-section { padding:18px 30px; background:#0d0d0d; border-bottom:1px solid #222; }
     .batch-row { display:flex; gap:12px; max-width:700px; margin:0 auto; align-items:center; }
     .batch-row label { font-size:13px; color:#888; font-weight:600; white-space:nowrap; text-transform:uppercase; letter-spacing:1px; }
@@ -810,70 +802,55 @@ app.get("/attendance", async (req, res) => {
     .batch-lock-btn:hover { background:#ff9800; color:#000; }
     .batch-lock-btn.locked { background:rgba(0,230,118,0.1); border-color:#00e676; color:#00e676; cursor:default; }
     .batch-lock-btn.locked:hover { background:rgba(0,230,118,0.1); color:#00e676; }
-
     .input-section { padding:25px 30px; background:#111; border-bottom:1px solid #222; }
     .input-row { display:flex; gap:12px; max-width:700px; margin:0 auto; }
     .input-row input { flex:1; padding:16px 24px; font-size:22px; font-family:'Courier New',monospace; font-weight:700; letter-spacing:4px; text-align:center; text-transform:uppercase; background:#1a1a1a; border:2px solid #333; border-radius:14px; color:#fff; outline:none; transition:border-color 0.2s; }
     .input-row input:focus { border-color:#00e676; box-shadow:0 0 20px rgba(0,230,118,0.15); }
     .input-row input::placeholder { color:#555; letter-spacing:1px; font-size:16px; font-weight:400; }
+    .input-row input:disabled { opacity:0.3; cursor:not-allowed; }
     .btn-clear { padding:16px 24px; background:#2a1a1a; border:2px solid #ff5252; border-radius:14px; color:#ff5252; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
     .btn-clear:hover { background:#ff5252; color:#fff; }
-
     .instructions { max-width:700px; margin:0 auto; display:flex; gap:20px; margin-top:15px; flex-wrap:wrap; justify-content:center; }
     .inst-chip { background:rgba(255,255,255,0.04); border:1px solid #2a2a2a; border-radius:20px; padding:6px 14px; font-size:12px; color:#888; display:flex; align-items:center; gap:6px; }
     .inst-chip .dot { width:6px; height:6px; border-radius:50%; background:#00e676; }
-
     .flash { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0); z-index:1000; padding:30px 60px; border-radius:20px; font-size:28px; font-weight:800; text-align:center; pointer-events:none; transition:transform 0.15s ease-out, opacity 0.3s; opacity:0; }
     .flash.show { transform:translate(-50%,-50%) scale(1); opacity:1; }
     .flash.success { background:rgba(0,230,118,0.95); color:#000; box-shadow:0 0 60px rgba(0,230,118,0.5); }
     .flash.error { background:rgba(255,82,82,0.95); color:#fff; box-shadow:0 0 60px rgba(255,82,82,0.5); }
     .flash.duplicate { background:rgba(255,193,7,0.95); color:#000; box-shadow:0 0 60px rgba(255,193,7,0.5); }
     .flash .sub { font-size:14px; font-weight:400; margin-top:5px; opacity:0.8; }
-
     .list-section { padding:20px 30px; }
     .list-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px; }
     .list-header h2 { font-size:16px; color:#888; font-weight:500; }
     .search-box { padding:8px 16px; background:#1a1a1a; border:1px solid #333; border-radius:8px; color:#fff; font-size:13px; outline:none; width:200px; }
     .search-box:focus { border-color:#00e676; }
-
     .attendance-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:10px; }
-
     .att-card { background:#151515; border:1px solid #222; border-radius:12px; padding:14px 18px; display:flex; align-items:center; gap:14px; transition:all 0.2s; animation:slideIn 0.3s ease-out; }
     .att-card:hover { border-color:#333; background:#1a1a1a; }
     .att-card.duplicate-card { border-color:#ff9800; background:rgba(255,152,0,0.05); }
-
     @keyframes slideIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
-
     .att-num { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; }
     .att-num.valid { background:rgba(0,230,118,0.15); color:#00e676; }
     .att-num.invalid { background:rgba(255,82,82,0.15); color:#ff5252; }
-
     .att-info { flex:1; min-width:0; }
     .att-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .att-meta { font-size:11px; color:#666; margin-top:3px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-
     .att-time { font-size:11px; color:#555; text-align:right; flex-shrink:0; }
     .att-time .time { color:#888; font-weight:500; }
-
     .att-badge { font-size:10px; padding:2px 8px; border-radius:6px; font-weight:600; }
     .att-badge.dup { background:rgba(255,152,0,0.15); color:#ff9800; }
     .att-badge.course { background:rgba(68,138,255,0.15); color:#448aff; }
     .att-badge.batch { background:rgba(255,152,0,0.15); color:#ff9800; }
-
     .empty { text-align:center; padding:60px 20px; color:#444; }
     .empty .icon { font-size:48px; margin-bottom:15px; }
     .empty p { font-size:14px; }
-
     .btn-export { padding:8px 16px; background:rgba(68,138,255,0.1); border:1px solid #448aff; border-radius:8px; color:#448aff; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; }
     .btn-export:hover { background:#448aff; color:#fff; }
-
     .sound-toggle { position:fixed; bottom:20px; right:20px; width:44px; height:44px; border-radius:50%; background:#222; border:1px solid #333; color:#888; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:100; transition:all 0.2s; }
     .sound-toggle:hover { background:#333; color:#fff; }
     .sound-toggle.muted { color:#ff5252; }
-
     .no-batch-warning { color:#ff5252; font-size:12px; text-align:center; margin-top:8px; display:none; }
     .no-batch-warning.show { display:block; }
-
     @media(max-width:600px) {
       .header { padding:15px; }
       .header h1 { font-size:18px; }
@@ -890,32 +867,16 @@ app.get("/attendance", async (req, res) => {
   </style>
 </head>
 <body>
-
-  <div class="flash" id="flash">
-    <div id="flashIcon"></div>
-    <div id="flashSub" class="sub"></div>
-  </div>
-
+  <div class="flash" id="flash"><div id="flashIcon"></div><div id="flashSub" class="sub"></div></div>
   <button class="sound-toggle" id="soundBtn" onclick="toggleSound()" title="Toggle Sound">🔊</button>
-
   <div class="header">
     <h1>🎯 Zoom <span>Attendance</span></h1>
     <div class="header-stats">
-      <div class="stat-box green">
-        <div class="num" id="validCount">0</div>
-        <div class="lbl">Present</div>
-      </div>
-      <div class="stat-box red">
-        <div class="num" id="invalidCount">0</div>
-        <div class="lbl">Invalid</div>
-      </div>
-      <div class="stat-box blue">
-        <div class="num" id="dupCount">0</div>
-        <div class="lbl">Duplicate</div>
-      </div>
+      <div class="stat-box green"><div class="num" id="validCount">0</div><div class="lbl">Present</div></div>
+      <div class="stat-box red"><div class="num" id="invalidCount">0</div><div class="lbl">Invalid</div></div>
+      <div class="stat-box blue"><div class="num" id="dupCount">0</div><div class="lbl">Duplicate</div></div>
     </div>
   </div>
-
   <div class="batch-section">
     <div class="batch-row">
       <label>📦 Batch Name:</label>
@@ -924,7 +885,6 @@ app.get("/attendance", async (req, res) => {
     </div>
     <div class="no-batch-warning" id="noBatchWarning">⚠️ Please enter & lock a batch name before scanning</div>
   </div>
-
   <div class="input-section">
     <div class="input-row">
       <input type="text" id="scanInput" placeholder="Type or paste 7-char ID..." autocomplete="off" spellcheck="false" disabled />
@@ -937,7 +897,6 @@ app.get("/attendance", async (req, res) => {
       <div class="inst-chip"><span class="dot"></span> Or paste from Zoom chat</div>
     </div>
   </div>
-
   <div class="list-section">
     <div class="list-header">
       <h2>📋 Attendance Log</h2>
@@ -953,7 +912,6 @@ app.get("/attendance", async (req, res) => {
       </div>
     </div>
   </div>
-
   <script>
     var scanInput = document.getElementById('scanInput');
     var batchInput = document.getElementById('batchInput');
@@ -967,263 +925,226 @@ app.get("/attendance", async (req, res) => {
     var counter = 0;
     var batchLocked = false;
     var currentBatch = '';
-
-    // Auto-fill today's date as default batch name
     var today = new Date().toLocaleString('en-IN', { timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric' });
     batchInput.value = 'Zoom Batch ' + today;
-
     setInterval(function() {
-      if (document.activeElement !== scanInput && document.activeElement !== document.getElementById('searchBox') && document.activeElement !== batchInput) {
-        scanInput.focus();
-      }
+      if (document.activeElement !== scanInput && document.activeElement !== document.getElementById('searchBox') && document.activeElement !== batchInput) { scanInput.focus(); }
     }, 150);
-
     var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep(freq, duration, type) {
       if (!soundEnabled) return;
-      try {
-        var osc = audioCtx.createOscillator();
-        var gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = type || 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-      } catch(e) {}
+      try { var o = audioCtx.createOscillator(); var g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type = type || 'sine'; o.frequency.value = freq; g.gain.setValueAtTime(0.3, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); o.start(); o.stop(audioCtx.currentTime + duration); } catch(e) {}
     }
     function playSuccess() { playBeep(880, 0.15); setTimeout(function() { playBeep(1100, 0.2); }, 100); }
     function playError() { playBeep(300, 0.3, 'square'); }
     function playDuplicate() { playBeep(600, 0.15); setTimeout(function() { playBeep(400, 0.2); }, 120); }
-
-    function toggleSound() {
-      soundEnabled = !soundEnabled;
-      var btn = document.getElementById('soundBtn');
-      btn.textContent = soundEnabled ? '🔊' : '🔇';
-      btn.classList.toggle('muted', !soundEnabled);
-    }
-
-    function showFlash(type, icon, sub) {
-      var flash = document.getElementById('flash');
-      document.getElementById('flashIcon').textContent = icon;
-      document.getElementById('flashSub').textContent = sub || '';
-      flash.className = 'flash ' + type + ' show';
-      setTimeout(function() { flash.className = 'flash ' + type; }, 1200);
-    }
-
-    function updateStats() {
-      var valid = 0, invalid = 0, dups = 0;
-      for (var i = 0; i < attendanceList.length; i++) {
-        if (attendanceList[i].valid && !attendanceList[i].duplicate) valid++;
-        else if (attendanceList[i].duplicate) dups++;
-        else invalid++;
-      }
-      document.getElementById('validCount').textContent = valid;
-      document.getElementById('invalidCount').textContent = invalid;
-      document.getElementById('dupCount').textContent = dups;
-    }
-
-    function getKolkataTime() {
-      return new Date().toLocaleString('en-IN', { timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true });
-    }
-
+    function toggleSound() { soundEnabled = !soundEnabled; var b = document.getElementById('soundBtn'); b.textContent = soundEnabled ? '🔊' : '🔇'; b.classList.toggle('muted', !soundEnabled); }
+    function showFlash(type, icon, sub) { var f = document.getElementById('flash'); document.getElementById('flashIcon').textContent = icon; document.getElementById('flashSub').textContent = sub || ''; f.className = 'flash ' + type + ' show'; setTimeout(function() { f.className = 'flash ' + type; }, 1200); }
+    function updateStats() { var v=0,i=0,d=0; for(var x=0;x<attendanceList.length;x++){if(attendanceList[x].valid&&!attendanceList[x].duplicate)v++;else if(attendanceList[x].duplicate)d++;else i++;} document.getElementById('validCount').textContent=v; document.getElementById('invalidCount').textContent=i; document.getElementById('dupCount').textContent=d; }
+    function getKolkataTime() { return new Date().toLocaleString('en-IN', { timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true }); }
     function addCard(entry) {
       if (emptyState) emptyState.style.display = 'none';
-      var card = document.createElement('div');
-      card.className = 'att-card' + (entry.duplicate ? ' duplicate-card' : '');
-      card.dataset.name = (entry.name || '').toLowerCase();
-      card.dataset.id = entry.id;
-      var batchHtml = entry.batch ? '<span class="att-badge batch">' + entry.batch + '</span>' : '';
-      card.innerHTML = '<div class="att-num ' + (entry.valid ? 'valid' : 'invalid') + '">' + entry.sno + '</div>' +
-        '<div class="att-info">' +
-          '<div class="att-name">' + (entry.name || '—') + '</div>' +
-          '<div class="att-meta">' +
-            '<span>ID: ' + entry.id + '</span>' +
-            (entry.course ? '<span class="att-badge course">' + entry.course + '</span>' : '') +
-            batchHtml +
-            (entry.duplicate ? '<span class="att-badge dup">DUPLICATE</span>' : '') +
-          '</div>' +
-        '</div>' +
-        '<div class="att-time"><div class="time">' + entry.time + '</div></div>';
-      attGrid.insertBefore(card, attGrid.firstChild);
+      var c = document.createElement('div'); c.className = 'att-card' + (entry.duplicate ? ' duplicate-card' : ''); c.dataset.name = (entry.name || '').toLowerCase(); c.dataset.id = entry.id;
+      var bh = entry.batch ? '<span class="att-badge batch">' + entry.batch + '</span>' : '';
+      c.innerHTML = '<div class="att-num ' + (entry.valid ? 'valid' : 'invalid') + '">' + entry.sno + '</div><div class="att-info"><div class="att-name">' + (entry.name || '—') + '</div><div class="att-meta"><span>ID: ' + entry.id + '</span>' + (entry.course ? '<span class="att-badge course">' + entry.course + '</span>' : '') + bh + (entry.duplicate ? '<span class="att-badge dup">DUPLICATE</span>' : '') + '</div></div><div class="att-time"><div class="time">' + entry.time + '</div></div>';
+      attGrid.insertBefore(c, attGrid.firstChild);
     }
-
-    function lockBatch() {
-      var name = batchInput.value.trim();
-      if (!name) {
-        noBatchWarning.classList.add('show');
-        batchInput.focus();
-        return;
-      }
-      currentBatch = name;
-      batchLocked = true;
-      batchInput.disabled = true;
-      batchLockBtn.textContent = '✅ ' + name;
-      batchLockBtn.classList.add('locked');
-      scanInput.disabled = false;
-      noBatchWarning.classList.remove('show');
-      scanInput.focus();
-    }
-
-    // Allow Enter on batch input to lock
-    batchInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        lockBatch();
-      }
-    });
-
+    function lockBatch() { var n = batchInput.value.trim(); if (!n) { noBatchWarning.classList.add('show'); batchInput.focus(); return; } currentBatch = n; batchLocked = true; batchInput.disabled = true; batchLockBtn.textContent = '✅ ' + n; batchLockBtn.classList.add('locked'); scanInput.disabled = false; noBatchWarning.classList.remove('show'); scanInput.focus(); }
+    batchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); lockBatch(); } });
     scanInput.addEventListener('keydown', async function(e) {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-
-      if (!batchLocked) {
-        noBatchWarning.classList.add('show');
-        return;
-      }
-
-      var rawId = scanInput.value.trim();
-      scanInput.value = '';
-      if (!rawId) return;
-
+      if (e.key !== 'Enter') return; e.preventDefault();
+      if (!batchLocked) { noBatchWarning.classList.add('show'); return; }
+      var rawId = scanInput.value.trim(); scanInput.value = ''; if (!rawId) return;
       var id = rawId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-
-      if (id.length !== 7) {
-        playError();
-        showFlash('error', '❌', 'Invalid length (' + id.length + '/7)');
-        counter++;
-        addCard({ sno: counter, id: id, name: '—', valid: false, duplicate: false, course: '', batch: currentBatch, time: getKolkataTime() });
-        attendanceList.push({ id: id, valid: false, duplicate: false, batch: currentBatch });
-        updateStats();
-        return;
-      }
-
-      if (scannedIds.has(id)) {
-        playDuplicate();
-        showFlash('duplicate', '⚠️', id + ' — Already Scanned!');
-        counter++;
-        var orig = null;
-        for (var i = 0; i < attendanceList.length; i++) { if (attendanceList[i].id === id) { orig = attendanceList[i]; break; } }
-        addCard({ sno: counter, id: id, name: orig ? orig.name : '—', valid: true, duplicate: true, course: orig ? orig.course : '', batch: currentBatch, time: getKolkataTime() });
-        attendanceList.push({ id: id, valid: true, duplicate: true, batch: currentBatch });
-        updateStats();
-        return;
-      }
-
-      try {
-        var res = await fetch('/api/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ barcode_id: id, batch_name: currentBatch })
-        });
-        var json = await res.json();
-        scannedIds.add(id);
-        counter++;
-
-        if (json.success) {
-          var u = json.data;
-          playSuccess();
-          showFlash('success', '✅', u.full_name);
-          var entry = { sno: counter, id: id, name: u.full_name, valid: true, duplicate: false, course: u.course_type || '', batch: currentBatch, time: getKolkataTime() };
-          addCard(entry);
-          attendanceList.push({ id: id, valid: true, duplicate: false, name: u.full_name, course: u.course_type || '', batch: currentBatch });
-        } else {
-          playError();
-          showFlash('error', '❌', json.message || 'Not Found');
-          addCard({ sno: counter, id: id, name: '—', valid: false, duplicate: false, course: '', batch: currentBatch, time: getKolkataTime() });
-          attendanceList.push({ id: id, valid: false, duplicate: false, batch: currentBatch });
-        }
-      } catch (err) {
-        playError();
-        showFlash('error', '🌐', 'Network Error');
-        counter++;
-        addCard({ sno: counter, id: id, name: '—', valid: false, duplicate: false, course: '', batch: currentBatch, time: getKolkataTime() });
-        attendanceList.push({ id: id, valid: false, duplicate: false, batch: currentBatch });
-      }
+      if (id.length !== 7) { playError(); showFlash('error', '❌', 'Invalid length (' + id.length + '/7)'); counter++; addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch}); updateStats(); return; }
+      if (scannedIds.has(id)) { playDuplicate(); showFlash('duplicate', '⚠️', id + ' — Already Scanned!'); counter++; var orig=null; for(var i=0;i<attendanceList.length;i++){if(attendanceList[i].id===id){orig=attendanceList[i];break;}} addCard({sno:counter,id:id,name:orig?orig.name:'—',valid:true,duplicate:true,course:orig?orig.course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:true,duplicate:true,batch:currentBatch}); updateStats(); return; }
+      try { var res = await fetch('/api/scan', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({barcode_id:id,batch_name:currentBatch}) }); var json = await res.json(); scannedIds.add(id); counter++;
+        if (json.success) { var u = json.data; playSuccess(); showFlash('success', '✅', u.full_name); addCard({sno:counter,id:id,name:u.full_name,valid:true,duplicate:false,course:u.course_type||'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:true,duplicate:false,name:u.full_name,course:u.course_type||'',batch:currentBatch}); }
+        else { playError(); showFlash('error', '❌', json.message || 'Not Found'); addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch}); }
+      } catch(err) { playError(); showFlash('error', '🌐', 'Network Error'); counter++; addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch}); }
       updateStats();
     });
-
-    function filterList() {
-      var q = document.getElementById('searchBox').value.toLowerCase();
-      var cards = attGrid.querySelectorAll('.att-card');
-      for (var i = 0; i < cards.length; i++) {
-        var match = cards[i].dataset.name.indexOf(q) !== -1 || cards[i].dataset.id.indexOf(q) !== -1;
-        cards[i].style.display = match ? '' : 'none';
-      }
-    }
-
-    function clearAll() {
-      if (!confirm('Clear all attendance records?')) return;
-      attendanceList = [];
-      scannedIds.clear();
-      counter = 0;
-      attGrid.innerHTML = '<div class="empty" id="emptyState"><div class="icon">📹</div><p>Waiting for first scan...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>';
-      updateStats();
-    }
-
-    function exportCSV() {
-      if (attendanceList.length === 0) { alert('No records to export'); return; }
-      var csv = 'S.No,ID,Name,Course,Batch,Status,Time\\n';
-      for (var i = 0; i < attendanceList.length; i++) {
-        var a = attendanceList[i];
-        var name = a.name || '—';
-        var status = a.duplicate ? 'DUPLICATE' : (a.valid ? 'VALID' : 'INVALID');
-        csv += (i+1) + ',' + a.id + ',"' + name + '","' + (a.course || '') + '","' + (a.batch || '') + '",' + status + ',' + (a.time || '') + '\\n';
-      }
-      var blob = new Blob([csv], { type: 'text/csv' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = (currentBatch || 'attendance').replace(/[^a-zA-Z0-9 ]/g, '').replace(/ +/g, '_') + '_' + new Date().toISOString().slice(0,10) + '.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    document.addEventListener('paste', function(e) {
-      if (document.activeElement === document.getElementById('searchBox')) return;
-      if (!batchLocked) return;
-      var text = (e.clipboardData || window.clipboardData).getData('text');
-      var cleaned = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      if (cleaned.length >= 7) {
-        scanInput.value = cleaned.slice(0, 7);
-        scanInput.focus();
-        if (cleaned.length === 7) {
-          setTimeout(function() { scanInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); }, 50);
-        }
-      }
-    });
+    function filterList() { var q = document.getElementById('searchBox').value.toLowerCase(); var cards = attGrid.querySelectorAll('.att-card'); for(var i=0;i<cards.length;i++){var m=cards[i].dataset.name.indexOf(q)!==-1||cards[i].dataset.id.indexOf(q)!==-1;cards[i].style.display=m?'':'none';} }
+    function clearAll() { if(!confirm('Clear all attendance records?'))return; attendanceList=[]; scannedIds.clear(); counter=0; attGrid.innerHTML='<div class="empty" id="emptyState"><div class="icon">📹</div><p>Waiting for first scan...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>'; updateStats(); }
+    function exportCSV() { if(attendanceList.length===0){alert('No records to export');return;} var csv='S.No,ID,Name,Course,Batch,Status,Time\\n'; for(var i=0;i<attendanceList.length;i++){var a=attendanceList[i];var s=a.duplicate?'DUPLICATE':(a.valid?'VALID':'INVALID'); csv+=(i+1)+','+a.id+',"'+(a.name||'—')+'","'+(a.course||'')+'","'+(a.batch||'')+'",'+s+','+(a.time||'')+'\\n';} var b=new Blob([csv],{type:'text/csv'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=(currentBatch||'attendance').replace(/[^a-zA-Z0-9 ]/g,'').replace(/ +/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(u); }
+    document.addEventListener('paste', function(e) { if(document.activeElement===document.getElementById('searchBox'))return; if(!batchLocked)return; var t=(e.clipboardData||window.clipboardData).getData('text'); var c=t.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); if(c.length>=7){scanInput.value=c.slice(0,7);scanInput.focus();if(c.length===7){setTimeout(function(){scanInput.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));},50);}} });
   </script>
 </body>
 </html>`);
+});
+
+// ==================================================================================
+// 🚪 ZOOM GATE - Student enters ID before joining Zoom meeting
+// ==================================================================================
+app.get("/join", async (req, res) => {
+  const { m, pwd, omn } = req.query;
+
+  if (!m) return res.send("❌ Missing meeting ID. Use: /join?m=MEETING_ID&pwd=PASSWORD");
+
+  const zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
+
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Zoom - Tushar Bhumkar Institute</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:#0a0a0a; color:#e5e5e5; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+    .container { width:100%; max-width:440px; }
+    .logo-area { text-align:center; margin-bottom:30px; }
+    .logo-area h1 { font-size:14px; font-weight:700; color:#003366; background:#fff; display:inline-block; padding:8px 20px; border-radius:8px; letter-spacing:1px; }
+    .card { background:#151515; border:1px solid #222; border-radius:20px; overflow:hidden; }
+    .card-top { background:linear-gradient(135deg,#1a1a2e,#16213e); padding:30px; text-align:center; }
+    .card-top .icon { font-size:48px; margin-bottom:12px; }
+    .card-top h2 { font-size:22px; font-weight:700; color:#fff; margin-bottom:6px; }
+    .card-top p { font-size:13px; color:#888; }
+    .card-body { padding:30px; }
+    .input-group { margin-bottom:20px; }
+    .input-group label { display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+    .input-group input { width:100%; padding:16px 20px; font-size:24px; font-family:'Courier New',monospace; font-weight:700; letter-spacing:6px; text-align:center; text-transform:uppercase; background:#0a0a0a; border:2px solid #333; border-radius:14px; color:#fff; outline:none; transition:all 0.3s; }
+    .input-group input:focus { border-color:#00e676; box-shadow:0 0 25px rgba(0,230,118,0.15); }
+    .input-group input::placeholder { color:#444; letter-spacing:2px; font-size:14px; font-weight:400; }
+    .btn-join { width:100%; padding:16px; background:linear-gradient(135deg,#00c853,#009624); border:none; border-radius:14px; color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:all 0.3s; letter-spacing:0.5px; }
+    .btn-join:hover { transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,200,83,0.3); }
+    .btn-join:active { transform:translateY(0); }
+    .btn-join:disabled { background:#333; color:#666; cursor:not-allowed; transform:none; box-shadow:none; }
+    .helper { text-align:center; margin-top:20px; }
+    .helper p { font-size:12px; color:#555; line-height:1.6; }
+    .helper a { color:#448aff; text-decoration:none; }
+    .msg-box { margin-top:20px; padding:14px 18px; border-radius:12px; font-size:13px; font-weight:500; text-align:center; display:none; animation:fadeIn 0.3s; }
+    .msg-box.show { display:block; }
+    .msg-box.error { background:rgba(255,82,82,0.1); border:1px solid rgba(255,82,82,0.3); color:#ff5252; }
+    .msg-box.success { background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.3); color:#00e676; }
+    .msg-box.loading { background:rgba(68,138,255,0.1); border:1px solid rgba(68,138,255,0.3); color:#448aff; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+    .spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(68,138,255,0.3); border-top-color:#448aff; border-radius:50%; animation:spin 0.6s linear infinite; vertical-align:middle; margin-right:8px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .footer { text-align:center; margin-top:25px; }
+    .footer p { font-size:11px; color:#333; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-area"><h1>TUSHAR BHUMKAR INSTITUTE</h1></div>
+    <div class="card">
+      <div class="card-top">
+        <div class="icon">📹</div>
+        <h2>Join Zoom Meeting</h2>
+        <p>Enter your Entry Pass ID to continue</p>
+      </div>
+      <div class="card-body">
+        <div class="input-group">
+          <label>Your 7-Character Entry Pass ID</label>
+          <input type="text" id="idInput" placeholder="e.g. ABC1234" autocomplete="off" spellcheck="false" maxlength="7" autofocus />
+        </div>
+        <button class="btn-join" id="joinBtn" onclick="verifyAndJoin()">Join Meeting →</button>
+        <div class="msg-box" id="msgBox"></div>
+        <div class="helper">
+          <p>📋 Your Entry Pass ID is the 7-character code<br>below the barcode on your pass image</p>
+          <p style="margin-top:8px;">Don't have your ID? <a href="https://tusharbhumkar.com" target="_blank">Contact Admin</a></p>
+        </div>
+      </div>
+    </div>
+    <div class="footer"><p>www.tusharbhumkar.com</p></div>
+  </div>
+  <script>
+    var idInput = document.getElementById('idInput');
+    var joinBtn = document.getElementById('joinBtn');
+    var msgBox = document.getElementById('msgBox');
+    var zoomUrl = '${zoomUrl}';
+    var verifying = false;
+    idInput.addEventListener('input', function() { this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase(); });
+    idInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); verifyAndJoin(); } });
+    function showMsg(type, html) { msgBox.className = 'msg-box show ' + type; msgBox.innerHTML = html; }
+    function hideMsg() { msgBox.className = 'msg-box'; }
+    async function verifyAndJoin() {
+      if (verifying) return;
+      var id = idInput.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().trim();
+      if (!id) { showMsg('error', '❌ Please enter your Entry Pass ID'); idInput.focus(); return; }
+      if (id.length !== 7) { showMsg('error', '❌ ID must be exactly 7 characters (you entered ' + id.length + ')'); idInput.focus(); return; }
+      verifying = true; joinBtn.disabled = true; joinBtn.textContent = 'Verifying...'; showMsg('loading', '<span class="spinner"></span> Checking your Entry Pass...');
+      try {
+        var res = await fetch('/api/verify-join', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({barcode_id:id, meeting_id:'${m}'}) });
+        var json = await res.json();
+        if (json.success) {
+          showMsg('success', '✅ Welcome ' + json.name + '! Redirecting to Zoom...');
+          joinBtn.textContent = '✅ Verified — Joining...'; joinBtn.style.background = 'linear-gradient(135deg,#00c853,#009624)';
+          setTimeout(function() { window.location.href = zoomUrl; }, 1500);
+        } else {
+          showMsg('error', '❌ ' + (json.message || 'Invalid ID. Contact admin if you think this is wrong.'));
+          joinBtn.disabled = false; joinBtn.textContent = 'Join Meeting →'; verifying = false; idInput.select();
+        }
+      } catch (err) { showMsg('error', '🌐 Network error. Check your internet and try again.'); joinBtn.disabled = false; joinBtn.textContent = 'Join Meeting →'; verifying = false; }
+    }
+    idInput.focus();
+  </script>
+</body>
+</html>`);
+});
+
+// ==================================================================================
+// ✅ VERIFY JOIN - Checks ID, logs to scans, updates users.date
+// ==================================================================================
+app.post("/api/verify-join", async (req, res) => {
+  try {
+    let { barcode_id, meeting_id } = req.body;
+    barcode_id = String(barcode_id || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+
+    if (!barcode_id || barcode_id.length !== 7) {
+      return res.json({ success: false, message: "ID must be exactly 7 characters" });
+    }
+
+    const ur = await pool.query("SELECT id, full_name, course_type FROM users WHERE id=$1", [barcode_id]);
+
+    if (ur.rows.length === 0) {
+      console.log("❌ Zoom join denied - ID not found:", barcode_id, "| Meeting:", meeting_id);
+      return res.json({ success: false, message: "ID not found in database" });
+    }
+
+    const u = ur.rows[0];
+    console.log("✅ Zoom join approved:", u.full_name, "| ID:", barcode_id, "| Meeting:", meeting_id);
+
+    // Log to scans table
+    await pool.query(
+      `INSERT INTO scans (barcode_id, course_type, device_info, batch_name, scanned_at)
+       VALUES ($1, $2, $3, $4, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`,
+      [barcode_id, u.course_type || 'Unknown', 'Zoom Join Gate', 'Zoom Meeting: ' + (meeting_id || 'unknown')]
+    );
+
+    // Update users.date (same as scan endpoint)
+    const kolkataTime = await pool.query(
+      `SELECT TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 'DD/MM/YYYY, HH12:MI:SS AM') AS kolkata_now`
+    );
+    await pool.query(`UPDATE users SET date = $1 WHERE id = $2`, [kolkataTime.rows[0].kolkata_now, barcode_id]);
+
+    res.json({ success: true, name: u.full_name, id: u.id });
+
+  } catch (e) {
+    console.error("❌ VERIFY JOIN ERROR:", e.message);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
 // ==================================================================================
-// ✅ FIXED: DB INIT - Migrates 'date' column from DATE → VARCHAR(50) + adds batch_name to scans
+// ✅ DB INIT - All tables + batch_name column auto-migration
 // ==================================================================================
 async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    // 1. Create table if not exists (safe - skips if already exists)
     await client.query(`CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(7) PRIMARY KEY, full_name VARCHAR(255), address TEXT, email VARCHAR(255), phone VARCHAR(20), dob DATE, date VARCHAR(50), trading_market VARCHAR(100), trading_type VARCHAR(100), source VARCHAR(100), software_used VARCHAR(100), amount NUMERIC, payment_mode VARCHAR(50), selfie_image TEXT, payment_image TEXT, aadhar_back_image TEXT, aadhar_front_image TEXT, course_type VARCHAR(100)
     );`);
 
-    // 2. ✅ CRITICAL FIX: Convert 'date' column from DATE → VARCHAR(50) if it's still DATE type
     await client.query(`
       DO $$ BEGIN
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'users' AND column_name = 'date'
-        ) THEN
-          IF NOT EXISTS (
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = 'users' AND column_name = 'date' AND data_type = 'character varying'
-          ) THEN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'date') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'date' AND data_type = 'character varying') THEN
             ALTER TABLE users ALTER COLUMN date TYPE VARCHAR(50) USING date::text;
             RAISE NOTICE '✅ FIXED: date column converted from DATE to VARCHAR(50)';
           ELSE
@@ -1233,7 +1154,6 @@ async function initializeDatabase() {
       END $$;
     `);
 
-    // 3. Add created_at column if missing
     await client.query(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'created_at') THEN
@@ -1246,12 +1166,10 @@ async function initializeDatabase() {
       END $$;
     `);
 
-    // 4. Scans table (with batch_name column)
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
       id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255), scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT, batch_name VARCHAR(255)
     );`);
 
-    // 5. ✅ Add batch_name column to scans table if missing (for existing databases)
     await client.query(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'scans' AND column_name = 'batch_name') THEN
@@ -1263,7 +1181,6 @@ async function initializeDatabase() {
       END $$;
     `);
 
-    // 6. Google form responses table
     await client.query(`CREATE TABLE IF NOT EXISTS google_form_responses (
       id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
