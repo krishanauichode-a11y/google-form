@@ -48,6 +48,19 @@ function generateShortId() {
   return result;
 }
 
+function fixDriveUrl(url) {
+  if (!url || url.length < 10) return "";
+  if (url.includes("drive.usercontent.google.com/download")) {
+    const match = url.match(/[?&]id=([^&]+)/);
+    if (match) return "https://drive.google.com/uc?export=view&id=" + match[1];
+  }
+  if (url.includes("drive.google.com/file/d/")) {
+    const match = url.match(/\/file\/d\/([^/]+)/);
+    if (match) return "https://drive.google.com/uc?export=view&id=" + match[1];
+  }
+  return url;
+}
+
 app.get("/", (req, res) => res.send("✅ Server Running"));
 
 // ==================================================================================
@@ -515,14 +528,15 @@ function checkAdmin(req, res) {
 }
 
 // ==================================================================================
-// ✅ USER VIEW PAGE - With image popup (no new tab)
+// ✅ USER VIEW PAGE - Image popup + Google Drive URL fix
 // ==================================================================================
 app.get("/user/:id", async (req, res) => {
   try {
     if (!checkAdmin(req, res)) return;
     const u = (await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id])).rows[0];
     if (!u) return res.send("<h2>❌ Invalid QR</h2>");
-    const gi = (url) => url || "https://via.placeholder.com/150?text=No+Image";
+
+    const gi = (url) => { const f = fixDriveUrl(url); return f || "https://via.placeholder.com/150?text=No+Image"; };
 
     const createdAtDisplay = u.created_at ? new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'N/A';
     const scanDateDisplay = u.date || 'Never';
@@ -549,25 +563,23 @@ app.get("/user/:id", async (req, res) => {
     .info-label{color:#555;font-weight:500;font-size:14px;margin-bottom:5px}
     .info-value{font-weight:600;color:#222;font-size:14px;padding:8px 12px;background:rgba(0,200,83,0.05);border-radius:6px;min-height:40px;word-wrap:break-word}
     .images-grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-top:20px}
-    .image-card{text-align:center;width:120px;cursor:pointer}
+    .image-card{text-align:center;width:120px;cursor:pointer;user-select:none;-webkit-user-select:none}
     .image-card div{font-size:12px;margin-bottom:5px;color:#555;font-weight:600}
-    .image-card img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #ddd;background:#f5f5f5;transition:transform 0.2s,box-shadow 0.2s}
-    .image-card img:hover{transform:scale(1.05);box-shadow:0 4px 15px rgba(0,0,0,0.2)}
+    .image-card img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #ddd;background:#f5f5f5;transition:transform 0.2s,box-shadow 0.2s;pointer-events:none}
+    .image-card:hover img{transform:scale(1.05);box-shadow:0 4px 15px rgba(0,0,0,0.2)}
     .card-footer{text-align:center;padding:20px;font-size:14px;color:#777;border-top:1px solid #eee}
     .status{text-align:center;margin-top:20px;font-size:16px;color:#00c853;font-weight:600;padding:12px;border-radius:8px;background:rgba(0,200,83,0.1)}
     .error-msg{color:#ff4444;font-size:16px;font-weight:600;display:none;margin-top:20px;padding:12px;border-radius:8px;background:rgba(255,68,68,0.1)}
     .form-status-box{margin-top:20px;padding:16px;border-radius:10px;text-align:center;font-size:14px}
     .form-filled{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
     .form-pending{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
-    .img-popup{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:none;justify-content:center;align-items:center;cursor:zoom-out;animation:popIn 0.2s ease-out}
+    .img-popup{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:none;justify-content:center;align-items:center;cursor:zoom-out}
     .img-popup.show{display:flex}
-    .img-popup img{max-width:92vw;max-height:90vh;border-radius:12px;box-shadow:0 0 40px rgba(0,0,0,0.5);animation:zoomIn 0.2s ease-out}
-    .img-popup .close-btn{position:absolute;top:20px;right:25px;font-size:32px;color:#fff;cursor:pointer;width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.2s;border:none}
-    .img-popup .close-btn:hover{background:rgba(255,255,255,0.25)}
-    .img-popup .img-label{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;font-weight:500;background:rgba(0,0,0,0.6);padding:6px 16px;border-radius:8px}
-    @keyframes popIn{from{opacity:0}to{opacity:1}}
-    @keyframes zoomIn{from{transform:scale(0.8);opacity:0}to{transform:scale(1);opacity:1}}
-    @media(max-width:767px){.info-container{grid-template-columns:1fr}}
+    .img-popup img{max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 0 60px rgba(0,0,0,0.6);background:#111}
+    .img-popup .close-btn{position:absolute;top:15px;right:20px;font-size:30px;color:#fff;cursor:pointer;width:46px;height:46px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.2s;border:none;line-height:1}
+    .img-popup .close-btn:hover{background:rgba(255,255,255,0.3)}
+    .img-popup .img-label{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;font-weight:500;background:rgba(0,0,0,0.7);padding:8px 18px;border-radius:8px;white-space:nowrap}
+    @media(max-width:767px){.info-container{grid-template-columns:1fr}.img-popup img{max-width:95vw;max-height:85vh}}
   </style>
 </head>
 <body>
@@ -601,19 +613,19 @@ app.get("/user/:id", async (req, res) => {
         <div class="images-grid">
           <div class="image-card" onclick="openPopup(this)">
             <div>Selfie</div>
-            <img id="u-selfie" src="${gi(u.selfie_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'" data-full="${u.selfie_image || ''}" loading="eager"/>
+            <img id="u-selfie" src="${gi(u.selfie_image)}" data-full="${fixDriveUrl(u.selfie_image)}" data-placeholder="https://via.placeholder.com/150?text=No+Selfie" loading="eager"/>
           </div>
           <div class="image-card" onclick="openPopup(this)">
             <div>Payment Proof</div>
-            <img id="u-payment" src="${gi(u.payment_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Payment'" data-full="${u.payment_image || ''}" loading="eager"/>
+            <img id="u-payment" src="${gi(u.payment_image)}" data-full="${fixDriveUrl(u.payment_image)}" data-placeholder="https://via.placeholder.com/150?text=No+Payment" loading="eager"/>
           </div>
           <div class="image-card" onclick="openPopup(this)">
             <div>Aadhar Front</div>
-            <img id="u-aadhar_front" src="${gi(u.aadhar_front_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'" data-full="${u.aadhar_front_image || ''}" loading="eager"/>
+            <img id="u-aadhar_front" src="${gi(u.aadhar_front_image)}" data-full="${fixDriveUrl(u.aadhar_front_image)}" data-placeholder="https://via.placeholder.com/150?text=No+Aadhar" loading="eager"/>
           </div>
           <div class="image-card" onclick="openPopup(this)">
             <div>Aadhar Back</div>
-            <img id="u-aadhar_back" src="${gi(u.aadhar_back_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'" data-full="${u.aadhar_back_image || ''}" loading="eager"/>
+            <img id="u-aadhar_back" src="${gi(u.aadhar_back_image)}" data-full="${fixDriveUrl(u.aadhar_back_image)}" data-placeholder="https://via.placeholder.com/150?text=No+Aadhar" loading="eager"/>
           </div>
         </div>
       </div>
@@ -623,16 +635,17 @@ app.get("/user/:id", async (req, res) => {
     </div>
     <div class="card-footer">Scan QR / Barcode at Entry Gate</div>
   </div>
-  <div class="img-popup" id="imgPopup" onclick="closePopup()">
-    <button class="close-btn" onclick="closePopup()">✕</button>
+  <div class="img-popup" id="imgPopup" onclick="closePopup(event)">
+    <button class="close-btn" onclick="closePopup(event)">✕</button>
     <img id="popupImg" src="" />
     <div class="img-label" id="popupLabel"></div>
   </div>
   <script>
     var popup=document.getElementById('imgPopup'),popupImg=document.getElementById('popupImg'),popupLabel=document.getElementById('popupLabel');
-    function openPopup(card){var img=card.querySelector('img');var fullUrl=img.getAttribute('data-full');var label=card.querySelector('div').textContent;if(!fullUrl||fullUrl.length<10)return;popupImg.src=fullUrl;popupLabel.textContent=label;popup.classList.add('show');document.body.style.overflow='hidden';}
-    function closePopup(){popup.classList.remove('show');popupImg.src='';document.body.style.overflow='';}
-    document.addEventListener('keydown',function(e){if(e.key==='Escape')closePopup();});
+    function fixDriveUrl(url){if(!url||url.length<10)return'';if(url.indexOf('drive.usercontent.google.com/download')!==-1){var m=url.match(/[?&]id=([^&]+)/);if(m)return'https://drive.google.com/uc?export=view&id='+m[1];}if(url.indexOf('drive.google.com/file/d/')!==-1){var m=url.match(/\\/file\\/d\\/([^\\/]+)/);if(m)return'https://drive.google.com/uc?export=view&id='+m[1];}return url;}
+    function openPopup(card){var img=card.querySelector('img');var fullUrl=fixDriveUrl(img.getAttribute('data-full'))||fixDriveUrl(img.src);var label=card.querySelector('div').textContent;var placeholder=img.getAttribute('data-placeholder')||'';if(!fullUrl||fullUrl.length<10){popupImg.style.display='none';popupLabel.textContent=label+' — No image';popup.classList.add('show');document.body.style.overflow='hidden';return;}popupImg.style.display='block';popupImg.src='';popupLabel.textContent=label;popup.classList.add('show');document.body.style.overflow='hidden';popupImg.src=fullUrl;}
+    function closePopup(e){if(e&&e.target!==popup&&e.target!==popupImg&&!e.target.classList.contains('close-btn'))return;popup.classList.remove('show');popupImg.src='';document.body.style.overflow='';}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closePopup({target:popup});});
     var input=document.getElementById('scanInput');
     setInterval(function(){if(document.activeElement!==input)input.focus();},100);
     async function getScanCount(userId){try{var res=await fetch('/api/scan-count/'+userId);var json=await res.json();document.getElementById('u-scan_count').innerText=json.success?(json.count+' time(s)'):'0 time(s)';}catch(e){document.getElementById('u-scan_count').innerText='Error';}}
@@ -640,7 +653,7 @@ app.get("/user/:id", async (req, res) => {
     checkFormStatus('${u.id}');getScanCount('${u.id}');
     input.addEventListener('keydown',async function(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();var id=input.value;input.value='';if(id){id=id.replace(/[^A-Za-z0-9]/g,'').toUpperCase().trim();if(id.length===7){window.history.pushState({},"","/user/"+id);await loadUserData(id);}else{document.getElementById('error-display').style.display='block';document.getElementById('error-display').innerText='❌ Invalid barcode length ('+id.length+' chars). Need exactly 7.';document.getElementById('statusMsg').innerText="❌ Invalid Barcode";document.getElementById('statusMsg').style.color="#ff4444";document.getElementById('statusMsg').style.background="rgba(255,68,68,0.1)";}}}});
     async function loadUserData(id){try{var res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id})});var json=await res.json();if(json.success){var u=json.data;document.getElementById('error-display').style.display='none';document.getElementById('u-full_name').innerText=u.full_name;document.getElementById('u-email').innerText=u.email;document.getElementById('u-phone').innerText=u.phone;document.getElementById('u-dob').innerText=u.dob;document.getElementById('u-market').innerText=u.trading_market;document.getElementById('u-type').innerText=u.trading_type;document.getElementById('u-software').innerText=u.software_used;document.getElementById('u-amount').innerText='₹ '+u.amount;document.getElementById('u-mode').innerText=u.payment_mode;document.getElementById('u-course').innerText=u.course_type;document.getElementById('u-scan_date').innerText=u.date||'Never';if(u.created_at){document.getElementById('u-created_at').innerText=new Date(u.created_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});}else{document.getElementById('u-created_at').innerText='N/A';}
-    function upImg(imgId,url,placeholder){var img=document.getElementById(imgId);if(url&&url.length>10){img.src=url;img.setAttribute('data-full',url);}else{img.src=placeholder;img.setAttribute('data-full','');}}
+    function upImg(imgId,url,placeholder){var img=document.getElementById(imgId);var fixed=fixDriveUrl(url);if(fixed){img.src=fixed;img.setAttribute('data-full',fixed);img.onerror=null;}else{img.src=placeholder;img.setAttribute('data-full','');}}
     upImg('u-selfie',u.selfie_image,"https://via.placeholder.com/150?text=No+Selfie");upImg('u-payment',u.payment_image,"https://via.placeholder.com/150?text=No+Payment");upImg('u-aadhar_front',u.aadhar_front_image,"https://via.placeholder.com/150?text=No+Aadhar");upImg('u-aadhar_back',u.aadhar_back_image,"https://via.placeholder.com/150?text=No+Aadhar");
     document.getElementById('statusMsg').innerText="✅ Scan logged - Valid Entry Approved";document.getElementById('statusMsg').style.color="#00c853";document.getElementById('statusMsg').style.background="rgba(0,200,83,0.1)";checkFormStatus(id);getScanCount(id);}else{document.getElementById('error-display').style.display='block';document.getElementById('error-display').innerText='❌ '+(json.message||json.error||'Invalid Barcode');document.getElementById('statusMsg').innerText="❌ "+(json.message||json.error||'Invalid Barcode');document.getElementById('statusMsg').style.color="#ff4444";document.getElementById('statusMsg').style.background="rgba(255,68,68,0.1)";}}catch(err){console.error('Scan error:',err);document.getElementById('error-display').style.display='block';document.getElementById('error-display').innerText='❌ Network Error: '+err.message;}}
   </script>
