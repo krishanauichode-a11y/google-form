@@ -979,7 +979,7 @@ app.get("/attendance", async (req, res) => {
 app.get("/join", async (req, res) => {
   const { m, pwd, omn } = req.query;
 
-  if (!m) return res.send("❌ Missing meeting ID. Use: /join?m=7730187149&pwd=HS7vJmrclzzVqOGz3zMD1to1aGfCGs.1&omn=85355860081");
+  if (!m) return res.send("❌ Missing meeting ID. Share this link: https://google-form-kebh.onrender.com/join?m=7730187149&pwd=HS7vJmrclzzVqOGz3zMD1to1aGfCGs.1&omn=85355860081");
 
   const zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
 
