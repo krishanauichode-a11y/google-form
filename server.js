@@ -515,7 +515,7 @@ function checkAdmin(req, res) {
 }
 
 // ==================================================================================
-// USER VIEW PAGE
+// ✅ USER VIEW PAGE - With image popup (no new tab)
 // ==================================================================================
 app.get("/user/:id", async (req, res) => {
   try {
@@ -534,33 +534,40 @@ app.get("/user/:id", async (req, res) => {
   <title>Verified Student</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif }
-    body { background:linear-gradient(135deg,#0f2027,#203a43,#2c5364); display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:100vh; padding:20px }
-    .scanner-box { margin-bottom:20px; text-align:center; width:100%; max-width:500px }
-    input#scanInput { padding:12px 20px; font-size:18px; width:100%; text-align:center; border:none; border-radius:10px; background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.3); outline:none }
-    input#scanInput::placeholder { color:rgba(255,255,255,0.7) }
-    .card { width:100%; max-width:1000px; background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 15px 40px rgba(0,0,0,0.4) }
-    .card-header { background:linear-gradient(135deg,#00c853,#009624); color:#fff; text-align:center; padding:25px }
-    .card-header h2 { font-size:24px; font-weight:600; margin-bottom:10px }
-    .badge { background:#fff; color:#00c853; display:inline-block; padding:6px 14px; border-radius:20px; font-size:14px; font-weight:600 }
-    .card-body { padding:25px }
-    .info-container { display:grid; grid-template-columns:repeat(3,1fr); gap:15px }
-    .info-item { display:flex; flex-direction:column }
-    .info-label { color:#555; font-weight:500; font-size:14px; margin-bottom:5px }
-    .info-value { font-weight:600; color:#222; font-size:14px; padding:8px 12px; background:rgba(0,200,83,0.05); border-radius:6px; min-height:40px; word-wrap:break-word }
-    .images-grid { display:flex; flex-wrap:wrap; gap:15px; justify-content:center; margin-top:20px }
-    .image-card { text-align:center; width:120px }
-    .image-card div { font-size:12px; margin-bottom:5px; color:#555; font-weight:600 }
-    .image-card a { text-decoration:none; display:block }
-    .image-card img { width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #ddd; background:#f5f5f5 }
-    .card-footer { text-align:center; padding:20px; font-size:14px; color:#777; border-top:1px solid #eee }
-    .status { text-align:center; margin-top:20px; font-size:16px; color:#00c853; font-weight:600; padding:12px; border-radius:8px; background:rgba(0,200,83,0.1) }
-    .error-msg { color:#ff4444; font-size:16px; font-weight:600; display:none; margin-top:20px; padding:12px; border-radius:8px; background:rgba(255,68,68,0.1) }
-    .form-status-box { margin-top:20px; padding:16px; border-radius:10px; text-align:center; font-size:14px }
-    .form-filled { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534 }
-    .form-pending { background:#fffbeb; border:1px solid #fde68a; color:#92400e }
-    .scan-count { margin-top:10px; font-size:13px; color:#888; text-align:center }
-    @media(max-width:767px) { .info-container { grid-template-columns:1fr } }
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif}
+    body{background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+    .scanner-box{margin-bottom:20px;text-align:center;width:100%;max-width:500px}
+    input#scanInput{padding:12px 20px;font-size:18px;width:100%;text-align:center;border:none;border-radius:10px;background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);outline:none}
+    input#scanInput::placeholder{color:rgba(255,255,255,0.7)}
+    .card{width:100%;max-width:1000px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 15px 40px rgba(0,0,0,0.4)}
+    .card-header{background:linear-gradient(135deg,#00c853,#009624);color:#fff;text-align:center;padding:25px}
+    .card-header h2{font-size:24px;font-weight:600;margin-bottom:10px}
+    .badge{background:#fff;color:#00c853;display:inline-block;padding:6px 14px;border-radius:20px;font-size:14px;font-weight:600}
+    .card-body{padding:25px}
+    .info-container{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+    .info-item{display:flex;flex-direction:column}
+    .info-label{color:#555;font-weight:500;font-size:14px;margin-bottom:5px}
+    .info-value{font-weight:600;color:#222;font-size:14px;padding:8px 12px;background:rgba(0,200,83,0.05);border-radius:6px;min-height:40px;word-wrap:break-word}
+    .images-grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-top:20px}
+    .image-card{text-align:center;width:120px;cursor:pointer}
+    .image-card div{font-size:12px;margin-bottom:5px;color:#555;font-weight:600}
+    .image-card img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #ddd;background:#f5f5f5;transition:transform 0.2s,box-shadow 0.2s}
+    .image-card img:hover{transform:scale(1.05);box-shadow:0 4px 15px rgba(0,0,0,0.2)}
+    .card-footer{text-align:center;padding:20px;font-size:14px;color:#777;border-top:1px solid #eee}
+    .status{text-align:center;margin-top:20px;font-size:16px;color:#00c853;font-weight:600;padding:12px;border-radius:8px;background:rgba(0,200,83,0.1)}
+    .error-msg{color:#ff4444;font-size:16px;font-weight:600;display:none;margin-top:20px;padding:12px;border-radius:8px;background:rgba(255,68,68,0.1)}
+    .form-status-box{margin-top:20px;padding:16px;border-radius:10px;text-align:center;font-size:14px}
+    .form-filled{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+    .form-pending{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+    .img-popup{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:none;justify-content:center;align-items:center;cursor:zoom-out;animation:popIn 0.2s ease-out}
+    .img-popup.show{display:flex}
+    .img-popup img{max-width:92vw;max-height:90vh;border-radius:12px;box-shadow:0 0 40px rgba(0,0,0,0.5);animation:zoomIn 0.2s ease-out}
+    .img-popup .close-btn{position:absolute;top:20px;right:25px;font-size:32px;color:#fff;cursor:pointer;width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.2s;border:none}
+    .img-popup .close-btn:hover{background:rgba(255,255,255,0.25)}
+    .img-popup .img-label{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;font-weight:500;background:rgba(0,0,0,0.6);padding:6px 16px;border-radius:8px}
+    @keyframes popIn{from{opacity:0}to{opacity:1}}
+    @keyframes zoomIn{from{transform:scale(0.8);opacity:0}to{transform:scale(1);opacity:1}}
+    @media(max-width:767px){.info-container{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -592,10 +599,22 @@ app.get("/user/:id", async (req, res) => {
       <div style="margin-top:25px;">
         <h3 style="margin-bottom:10px;text-align:center;">Verification Documents</h3>
         <div class="images-grid">
-          <div class="image-card"><div>Selfie</div><a href="${gi(u.selfie_image)}" target="_blank"><img id="u-selfie" src="${gi(u.selfie_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'"/></a></div>
-          <div class="image-card"><div>Payment Proof</div><a href="${gi(u.payment_image)}" target="_blank"><img id="u-payment" src="${gi(u.payment_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Payment'"/></a></div>
-          <div class="image-card"><div>Aadhar Front</div><a href="${gi(u.aadhar_front_image)}" target="_blank"><img id="u-aadhar_front" src="${gi(u.aadhar_front_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'"/></a></div>
-          <div class="image-card"><div>Aadhar Back</div><a href="${gi(u.aadhar_back_image)}" target="_blank"><img id="u-aadhar_back" src="${gi(u.aadhar_back_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'"/></a></div>
+          <div class="image-card" onclick="openPopup(this)">
+            <div>Selfie</div>
+            <img id="u-selfie" src="${gi(u.selfie_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Selfie'" data-full="${u.selfie_image || ''}" loading="eager"/>
+          </div>
+          <div class="image-card" onclick="openPopup(this)">
+            <div>Payment Proof</div>
+            <img id="u-payment" src="${gi(u.payment_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Payment'" data-full="${u.payment_image || ''}" loading="eager"/>
+          </div>
+          <div class="image-card" onclick="openPopup(this)">
+            <div>Aadhar Front</div>
+            <img id="u-aadhar_front" src="${gi(u.aadhar_front_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'" data-full="${u.aadhar_front_image || ''}" loading="eager"/>
+          </div>
+          <div class="image-card" onclick="openPopup(this)">
+            <div>Aadhar Back</div>
+            <img id="u-aadhar_back" src="${gi(u.aadhar_back_image)}" onerror="this.src='https://via.placeholder.com/150?text=No+Aadhar'" data-full="${u.aadhar_back_image || ''}" loading="eager"/>
+          </div>
         </div>
       </div>
       <div id="formStatusBox" class="form-status-box form-pending">🔄 Checking KYC Form status...</div>
@@ -604,131 +623,26 @@ app.get("/user/:id", async (req, res) => {
     </div>
     <div class="card-footer">Scan QR / Barcode at Entry Gate</div>
   </div>
+  <div class="img-popup" id="imgPopup" onclick="closePopup()">
+    <button class="close-btn" onclick="closePopup()">✕</button>
+    <img id="popupImg" src="" />
+    <div class="img-label" id="popupLabel"></div>
+  </div>
   <script>
-    const input = document.getElementById('scanInput');
-    setInterval(() => { if (document.activeElement !== input) input.focus(); }, 100);
-
-    async function getScanCount(userId) {
-      try {
-        const res = await fetch('/api/scan-count/' + userId);
-        const json = await res.json();
-        document.getElementById('u-scan_count').innerText = json.success ? (json.count + ' time(s)') : '0 time(s)';
-      } catch(e) {
-        document.getElementById('u-scan_count').innerText = 'Error';
-      }
-    }
-
-    async function checkFormStatus(userId) {
-      try {
-        const res = await fetch('/api/form-responses/' + userId);
-        const json = await res.json();
-        const box = document.getElementById('formStatusBox');
-        if (json.success && json.data) {
-          box.className = 'form-status-box form-filled';
-          box.innerHTML = '✅ KYC Form Filled — ' + json.data.received_at_formatted;
-        } else {
-          box.className = 'form-status-box form-pending';
-          box.innerHTML = '⏳ KYC Form Not Yet Filled';
-        }
-      } catch (e) {
-        document.getElementById('formStatusBox').innerHTML = 'ℹ️ Status unavailable';
-      }
-    }
-
-    checkFormStatus('${u.id}');
-    getScanCount('${u.id}');
-
-    input.addEventListener('keydown', async function(e) {
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        let id = input.value;
-        input.value = '';
-
-        if (id) {
-          id = id.replace(/[^A-Za-z0-9]/g, '').toUpperCase().trim();
-
-          if (id.length === 7) {
-            window.history.pushState({}, "", "/user/" + id);
-            await loadUserData(id);
-          } else {
-            document.getElementById('error-display').style.display = 'block';
-            document.getElementById('error-display').innerText = '❌ Invalid barcode length (' + id.length + ' chars). Need exactly 7.';
-            document.getElementById('statusMsg').innerText = "❌ Invalid Barcode";
-            document.getElementById('statusMsg').style.color = "#ff4444";
-            document.getElementById('statusMsg').style.background = "rgba(255,68,68,0.1)";
-          }
-        }
-      }
-    });
-
-    async function loadUserData(id) {
-      try {
-        const res = await fetch('/api/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ barcode_id: id })
-        });
-        const json = await res.json();
-
-        if (json.success) {
-          const u = json.data;
-          document.getElementById('error-display').style.display = 'none';
-          document.getElementById('u-full_name').innerText = u.full_name;
-          document.getElementById('u-email').innerText = u.email;
-          document.getElementById('u-phone').innerText = u.phone;
-          document.getElementById('u-dob').innerText = u.dob;
-          document.getElementById('u-market').innerText = u.trading_market;
-          document.getElementById('u-type').innerText = u.trading_type;
-          document.getElementById('u-software').innerText = u.software_used;
-          document.getElementById('u-amount').innerText = '₹ ' + u.amount;
-          document.getElementById('u-mode').innerText = u.payment_mode;
-          document.getElementById('u-course').innerText = u.course_type;
-          document.getElementById('u-scan_date').innerText = u.date || 'Never';
-
-          if (u.created_at) {
-            document.getElementById('u-created_at').innerText = new Date(u.created_at).toLocaleString('en-IN', {
-              timeZone: 'Asia/Kolkata',
-              day: '2-digit', month: '2-digit', year: 'numeric',
-              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
-            });
-          } else {
-            document.getElementById('u-created_at').innerText = 'N/A';
-          }
-
-          const up = (i, url, p) => {
-            let img = document.getElementById(i);
-            if (url && url.length > 10) {
-              img.src = url;
-              img.parentElement.href = url;
-            } else {
-              img.src = p;
-              img.parentElement.href = "#";
-            }
-          };
-          up('u-selfie', u.selfie_image, "https://via.placeholder.com/150?text=No+Selfie");
-          up('u-payment', u.payment_image, "https://via.placeholder.com/150?text=No+Payment");
-          up('u-aadhar_front', u.aadhar_front_image, "https://via.placeholder.com/150?text=No+Aadhar");
-          up('u-aadhar_back', u.aadhar_back_image, "https://via.placeholder.com/150?text=No+Aadhar");
-
-          document.getElementById('statusMsg').innerText = "✅ Scan logged - Valid Entry Approved";
-          document.getElementById('statusMsg').style.color = "#00c853";
-          document.getElementById('statusMsg').style.background = "rgba(0,200,83,0.1)";
-          checkFormStatus(id);
-          getScanCount(id);
-
-        } else {
-          document.getElementById('error-display').style.display = 'block';
-          document.getElementById('error-display').innerText = '❌ ' + (json.message || json.error || 'Invalid Barcode');
-          document.getElementById('statusMsg').innerText = "❌ " + (json.message || json.error || 'Invalid Barcode');
-          document.getElementById('statusMsg').style.color = "#ff4444";
-          document.getElementById('statusMsg').style.background = "rgba(255,68,68,0.1)";
-        }
-      } catch (err) {
-        console.error('Scan error:', err);
-        document.getElementById('error-display').style.display = 'block';
-        document.getElementById('error-display').innerText = '❌ Network Error: ' + err.message;
-      }
-    }
+    var popup=document.getElementById('imgPopup'),popupImg=document.getElementById('popupImg'),popupLabel=document.getElementById('popupLabel');
+    function openPopup(card){var img=card.querySelector('img');var fullUrl=img.getAttribute('data-full');var label=card.querySelector('div').textContent;if(!fullUrl||fullUrl.length<10)return;popupImg.src=fullUrl;popupLabel.textContent=label;popup.classList.add('show');document.body.style.overflow='hidden';}
+    function closePopup(){popup.classList.remove('show');popupImg.src='';document.body.style.overflow='';}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closePopup();});
+    var input=document.getElementById('scanInput');
+    setInterval(function(){if(document.activeElement!==input)input.focus();},100);
+    async function getScanCount(userId){try{var res=await fetch('/api/scan-count/'+userId);var json=await res.json();document.getElementById('u-scan_count').innerText=json.success?(json.count+' time(s)'):'0 time(s)';}catch(e){document.getElementById('u-scan_count').innerText='Error';}}
+    async function checkFormStatus(userId){try{var res=await fetch('/api/form-responses/'+userId);var json=await res.json();var box=document.getElementById('formStatusBox');if(json.success&&json.data){box.className='form-status-box form-filled';box.innerHTML='✅ KYC Form Filled — '+json.data.received_at_formatted;}else{box.className='form-status-box form-pending';box.innerHTML='⏳ KYC Form Not Yet Filled';}}catch(e){document.getElementById('formStatusBox').innerHTML='ℹ️ Status unavailable';}}
+    checkFormStatus('${u.id}');getScanCount('${u.id}');
+    input.addEventListener('keydown',async function(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();var id=input.value;input.value='';if(id){id=id.replace(/[^A-Za-z0-9]/g,'').toUpperCase().trim();if(id.length===7){window.history.pushState({},"","/user/"+id);await loadUserData(id);}else{document.getElementById('error-display').style.display='block';document.getElementById('error-display').innerText='❌ Invalid barcode length ('+id.length+' chars). Need exactly 7.';document.getElementById('statusMsg').innerText="❌ Invalid Barcode";document.getElementById('statusMsg').style.color="#ff4444";document.getElementById('statusMsg').style.background="rgba(255,68,68,0.1)";}}}});
+    async function loadUserData(id){try{var res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id})});var json=await res.json();if(json.success){var u=json.data;document.getElementById('error-display').style.display='none';document.getElementById('u-full_name').innerText=u.full_name;document.getElementById('u-email').innerText=u.email;document.getElementById('u-phone').innerText=u.phone;document.getElementById('u-dob').innerText=u.dob;document.getElementById('u-market').innerText=u.trading_market;document.getElementById('u-type').innerText=u.trading_type;document.getElementById('u-software').innerText=u.software_used;document.getElementById('u-amount').innerText='₹ '+u.amount;document.getElementById('u-mode').innerText=u.payment_mode;document.getElementById('u-course').innerText=u.course_type;document.getElementById('u-scan_date').innerText=u.date||'Never';if(u.created_at){document.getElementById('u-created_at').innerText=new Date(u.created_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});}else{document.getElementById('u-created_at').innerText='N/A';}
+    function upImg(imgId,url,placeholder){var img=document.getElementById(imgId);if(url&&url.length>10){img.src=url;img.setAttribute('data-full',url);}else{img.src=placeholder;img.setAttribute('data-full','');}}
+    upImg('u-selfie',u.selfie_image,"https://via.placeholder.com/150?text=No+Selfie");upImg('u-payment',u.payment_image,"https://via.placeholder.com/150?text=No+Payment");upImg('u-aadhar_front',u.aadhar_front_image,"https://via.placeholder.com/150?text=No+Aadhar");upImg('u-aadhar_back',u.aadhar_back_image,"https://via.placeholder.com/150?text=No+Aadhar");
+    document.getElementById('statusMsg').innerText="✅ Scan logged - Valid Entry Approved";document.getElementById('statusMsg').style.color="#00c853";document.getElementById('statusMsg').style.background="rgba(0,200,83,0.1)";checkFormStatus(id);getScanCount(id);}else{document.getElementById('error-display').style.display='block';document.getElementById('error-display').innerText='❌ '+(json.message||json.error||'Invalid Barcode');document.getElementById('statusMsg').innerText="❌ "+(json.message||json.error||'Invalid Barcode');document.getElementById('statusMsg').style.color="#ff4444";document.getElementById('statusMsg').style.background="rgba(255,68,68,0.1)";}}catch(err){console.error('Scan error:',err);document.getElementById('error-display').style.display='block';document.getElementById('error-display').innerText='❌ Network Error: '+err.message;}}
   </script>
 </body>
 </html>`);
@@ -780,90 +694,78 @@ app.get("/attendance", async (req, res) => {
   <title>Zoom Batch Attendance</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Inter',sans-serif; background:#0a0a0a; color:#e5e5e5; min-height:100vh; }
-    .header { background:linear-gradient(135deg,#1a1a2e,#16213e); padding:20px 30px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; }
-    .header h1 { font-size:22px; font-weight:700; }
-    .header h1 span { color:#00e676; }
-    .header-stats { display:flex; gap:20px; flex-wrap:wrap; }
-    .stat-box { background:rgba(255,255,255,0.05); border:1px solid #333; border-radius:12px; padding:10px 20px; text-align:center; min-width:100px; }
-    .stat-box .num { font-size:28px; font-weight:800; }
-    .stat-box .lbl { font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
-    .stat-box.green .num { color:#00e676; }
-    .stat-box.red .num { color:#ff5252; }
-    .stat-box.blue .num { color:#448aff; }
-    .batch-section { padding:18px 30px; background:#0d0d0d; border-bottom:1px solid #222; }
-    .batch-row { display:flex; gap:12px; max-width:700px; margin:0 auto; align-items:center; }
-    .batch-row label { font-size:13px; color:#888; font-weight:600; white-space:nowrap; text-transform:uppercase; letter-spacing:1px; }
-    .batch-row input { flex:1; padding:12px 18px; font-size:15px; background:#1a1a1a; border:2px solid #333; border-radius:10px; color:#fff; outline:none; transition:border-color 0.2s; }
-    .batch-row input:focus { border-color:#ff9800; box-shadow:0 0 15px rgba(255,152,0,0.15); }
-    .batch-row input::placeholder { color:#444; }
-    .batch-lock-btn { padding:12px 18px; background:rgba(255,152,0,0.1); border:2px solid #ff9800; border-radius:10px; color:#ff9800; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s; white-space:nowrap; text-transform:uppercase; letter-spacing:0.5px; }
-    .batch-lock-btn:hover { background:#ff9800; color:#000; }
-    .batch-lock-btn.locked { background:rgba(0,230,118,0.1); border-color:#00e676; color:#00e676; cursor:default; }
-    .batch-lock-btn.locked:hover { background:rgba(0,230,118,0.1); color:#00e676; }
-    .input-section { padding:25px 30px; background:#111; border-bottom:1px solid #222; }
-    .input-row { display:flex; gap:12px; max-width:700px; margin:0 auto; }
-    .input-row input { flex:1; padding:16px 24px; font-size:22px; font-family:'Courier New',monospace; font-weight:700; letter-spacing:4px; text-align:center; text-transform:uppercase; background:#1a1a1a; border:2px solid #333; border-radius:14px; color:#fff; outline:none; transition:border-color 0.2s; }
-    .input-row input:focus { border-color:#00e676; box-shadow:0 0 20px rgba(0,230,118,0.15); }
-    .input-row input::placeholder { color:#555; letter-spacing:1px; font-size:16px; font-weight:400; }
-    .input-row input:disabled { opacity:0.3; cursor:not-allowed; }
-    .btn-clear { padding:16px 24px; background:#2a1a1a; border:2px solid #ff5252; border-radius:14px; color:#ff5252; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
-    .btn-clear:hover { background:#ff5252; color:#fff; }
-    .instructions { max-width:700px; margin:0 auto; display:flex; gap:20px; margin-top:15px; flex-wrap:wrap; justify-content:center; }
-    .inst-chip { background:rgba(255,255,255,0.04); border:1px solid #2a2a2a; border-radius:20px; padding:6px 14px; font-size:12px; color:#888; display:flex; align-items:center; gap:6px; }
-    .inst-chip .dot { width:6px; height:6px; border-radius:50%; background:#00e676; }
-    .flash { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0); z-index:1000; padding:30px 60px; border-radius:20px; font-size:28px; font-weight:800; text-align:center; pointer-events:none; transition:transform 0.15s ease-out, opacity 0.3s; opacity:0; }
-    .flash.show { transform:translate(-50%,-50%) scale(1); opacity:1; }
-    .flash.success { background:rgba(0,230,118,0.95); color:#000; box-shadow:0 0 60px rgba(0,230,118,0.5); }
-    .flash.error { background:rgba(255,82,82,0.95); color:#fff; box-shadow:0 0 60px rgba(255,82,82,0.5); }
-    .flash.duplicate { background:rgba(255,193,7,0.95); color:#000; box-shadow:0 0 60px rgba(255,193,7,0.5); }
-    .flash .sub { font-size:14px; font-weight:400; margin-top:5px; opacity:0.8; }
-    .list-section { padding:20px 30px; }
-    .list-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px; }
-    .list-header h2 { font-size:16px; color:#888; font-weight:500; }
-    .search-box { padding:8px 16px; background:#1a1a1a; border:1px solid #333; border-radius:8px; color:#fff; font-size:13px; outline:none; width:200px; }
-    .search-box:focus { border-color:#00e676; }
-    .attendance-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:10px; }
-    .att-card { background:#151515; border:1px solid #222; border-radius:12px; padding:14px 18px; display:flex; align-items:center; gap:14px; transition:all 0.2s; animation:slideIn 0.3s ease-out; }
-    .att-card:hover { border-color:#333; background:#1a1a1a; }
-    .att-card.duplicate-card { border-color:#ff9800; background:rgba(255,152,0,0.05); }
-    @keyframes slideIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
-    .att-num { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; }
-    .att-num.valid { background:rgba(0,230,118,0.15); color:#00e676; }
-    .att-num.invalid { background:rgba(255,82,82,0.15); color:#ff5252; }
-    .att-info { flex:1; min-width:0; }
-    .att-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .att-meta { font-size:11px; color:#666; margin-top:3px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .att-time { font-size:11px; color:#555; text-align:right; flex-shrink:0; }
-    .att-time .time { color:#888; font-weight:500; }
-    .att-badge { font-size:10px; padding:2px 8px; border-radius:6px; font-weight:600; }
-    .att-badge.dup { background:rgba(255,152,0,0.15); color:#ff9800; }
-    .att-badge.course { background:rgba(68,138,255,0.15); color:#448aff; }
-    .att-badge.batch { background:rgba(255,152,0,0.15); color:#ff9800; }
-    .empty { text-align:center; padding:60px 20px; color:#444; }
-    .empty .icon { font-size:48px; margin-bottom:15px; }
-    .empty p { font-size:14px; }
-    .btn-export { padding:8px 16px; background:rgba(68,138,255,0.1); border:1px solid #448aff; border-radius:8px; color:#448aff; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; }
-    .btn-export:hover { background:#448aff; color:#fff; }
-    .sound-toggle { position:fixed; bottom:20px; right:20px; width:44px; height:44px; border-radius:50%; background:#222; border:1px solid #333; color:#888; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:100; transition:all 0.2s; }
-    .sound-toggle:hover { background:#333; color:#fff; }
-    .sound-toggle.muted { color:#ff5252; }
-    .no-batch-warning { color:#ff5252; font-size:12px; text-align:center; margin-top:8px; display:none; }
-    .no-batch-warning.show { display:block; }
-    @media(max-width:600px) {
-      .header { padding:15px; }
-      .header h1 { font-size:18px; }
-      .stat-box { min-width:80px; padding:8px 14px; }
-      .stat-box .num { font-size:22px; }
-      .batch-section { padding:12px 15px; }
-      .batch-row { flex-wrap:wrap; }
-      .batch-row label { width:100%; }
-      .input-section { padding:15px; }
-      .input-row input { font-size:18px; padding:14px 16px; letter-spacing:3px; }
-      .list-section { padding:15px; }
-      .attendance-grid { grid-template-columns:1fr; }
-    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#0a0a0a;color:#e5e5e5;min-height:100vh}
+    .header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:20px 30px;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px}
+    .header h1{font-size:22px;font-weight:700}
+    .header h1 span{color:#00e676}
+    .header-stats{display:flex;gap:20px;flex-wrap:wrap}
+    .stat-box{background:rgba(255,255,255,0.05);border:1px solid #333;border-radius:12px;padding:10px 20px;text-align:center;min-width:100px}
+    .stat-box .num{font-size:28px;font-weight:800}
+    .stat-box .lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+    .stat-box.green .num{color:#00e676}
+    .stat-box.red .num{color:#ff5252}
+    .stat-box.blue .num{color:#448aff}
+    .batch-section{padding:18px 30px;background:#0d0d0d;border-bottom:1px solid #222}
+    .batch-row{display:flex;gap:12px;max-width:700px;margin:0 auto;align-items:center}
+    .batch-row label{font-size:13px;color:#888;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:1px}
+    .batch-row input{flex:1;padding:12px 18px;font-size:15px;background:#1a1a1a;border:2px solid #333;border-radius:10px;color:#fff;outline:none;transition:border-color 0.2s}
+    .batch-row input:focus{border-color:#ff9800;box-shadow:0 0 15px rgba(255,152,0,0.15)}
+    .batch-row input::placeholder{color:#444}
+    .batch-lock-btn{padding:12px 18px;background:rgba(255,152,0,0.1);border:2px solid #ff9800;border-radius:10px;color:#ff9800;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;text-transform:uppercase;letter-spacing:0.5px}
+    .batch-lock-btn:hover{background:#ff9800;color:#000}
+    .batch-lock-btn.locked{background:rgba(0,230,118,0.1);border-color:#00e676;color:#00e676;cursor:default}
+    .batch-lock-btn.locked:hover{background:rgba(0,230,118,0.1);color:#00e676}
+    .input-section{padding:25px 30px;background:#111;border-bottom:1px solid #222}
+    .input-row{display:flex;gap:12px;max-width:700px;margin:0 auto}
+    .input-row input{flex:1;padding:16px 24px;font-size:22px;font-family:'Courier New',monospace;font-weight:700;letter-spacing:4px;text-align:center;text-transform:uppercase;background:#1a1a1a;border:2px solid #333;border-radius:14px;color:#fff;outline:none;transition:border-color 0.2s}
+    .input-row input:focus{border-color:#00e676;box-shadow:0 0 20px rgba(0,230,118,0.15)}
+    .input-row input::placeholder{color:#555;letter-spacing:1px;font-size:16px;font-weight:400}
+    .input-row input:disabled{opacity:0.3;cursor:not-allowed}
+    .btn-clear{padding:16px 24px;background:#2a1a1a;border:2px solid #ff5252;border-radius:14px;color:#ff5252;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+    .btn-clear:hover{background:#ff5252;color:#fff}
+    .instructions{max-width:700px;margin:0 auto;display:flex;gap:20px;margin-top:15px;flex-wrap:wrap;justify-content:center}
+    .inst-chip{background:rgba(255,255,255,0.04);border:1px solid #2a2a2a;border-radius:20px;padding:6px 14px;font-size:12px;color:#888;display:flex;align-items:center;gap:6px}
+    .inst-chip .dot{width:6px;height:6px;border-radius:50%;background:#00e676}
+    .flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);z-index:1000;padding:30px 60px;border-radius:20px;font-size:28px;font-weight:800;text-align:center;pointer-events:none;transition:transform 0.15s ease-out,opacity 0.3s;opacity:0}
+    .flash.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+    .flash.success{background:rgba(0,230,118,0.95);color:#000;box-shadow:0 0 60px rgba(0,230,118,0.5)}
+    .flash.error{background:rgba(255,82,82,0.95);color:#fff;box-shadow:0 0 60px rgba(255,82,82,0.5)}
+    .flash.duplicate{background:rgba(255,193,7,0.95);color:#000;box-shadow:0 0 60px rgba(255,193,7,0.5)}
+    .flash .sub{font-size:14px;font-weight:400;margin-top:5px;opacity:0.8}
+    .list-section{padding:20px 30px}
+    .list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px}
+    .list-header h2{font-size:16px;color:#888;font-weight:500}
+    .search-box{padding:8px 16px;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;outline:none;width:200px}
+    .search-box:focus{border-color:#00e676}
+    .attendance-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+    .att-card{background:#151515;border:1px solid #222;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:all 0.2s;animation:slideIn 0.3s ease-out}
+    .att-card:hover{border-color:#333;background:#1a1a1a}
+    .att-card.duplicate-card{border-color:#ff9800;background:rgba(255,152,0,0.05)}
+    @keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+    .att-num{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+    .att-num.valid{background:rgba(0,230,118,0.15);color:#00e676}
+    .att-num.invalid{background:rgba(255,82,82,0.15);color:#ff5252}
+    .att-info{flex:1;min-width:0}
+    .att-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .att-meta{font-size:11px;color:#666;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .att-time{font-size:11px;color:#555;text-align:right;flex-shrink:0}
+    .att-time .time{color:#888;font-weight:500}
+    .att-badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600}
+    .att-badge.dup{background:rgba(255,152,0,0.15);color:#ff9800}
+    .att-badge.course{background:rgba(68,138,255,0.15);color:#448aff}
+    .att-badge.batch{background:rgba(255,152,0,0.15);color:#ff9800}
+    .empty{text-align:center;padding:60px 20px;color:#444}
+    .empty .icon{font-size:48px;margin-bottom:15px}
+    .empty p{font-size:14px}
+    .btn-export{padding:8px 16px;background:rgba(68,138,255,0.1);border:1px solid #448aff;border-radius:8px;color:#448aff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s}
+    .btn-export:hover{background:#448aff;color:#fff}
+    .sound-toggle{position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;background:#222;border:1px solid #333;color:#888;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:100;transition:all 0.2s}
+    .sound-toggle:hover{background:#333;color:#fff}
+    .sound-toggle.muted{color:#ff5252}
+    .no-batch-warning{color:#ff5252;font-size:12px;text-align:center;margin-top:8px;display:none}
+    .no-batch-warning.show{display:block}
+    @media(max-width:600px){.header{padding:15px}.header h1{font-size:18px}.stat-box{min-width:80px;padding:8px 14px}.stat-box .num{font-size:22px}.batch-section{padding:12px 15px}.batch-row{flex-wrap:wrap}.batch-row label{width:100%}.input-section{padding:15px}.input-row input{font-size:18px;padding:14px 16px;letter-spacing:3px}.list-section{padding:15px}.attendance-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -906,68 +808,30 @@ app.get("/attendance", async (req, res) => {
       </div>
     </div>
     <div class="attendance-grid" id="attGrid">
-      <div class="empty" id="emptyState">
-        <div class="icon">📹</div>
-        <p>Lock a batch name above to start scanning...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p>
-      </div>
+      <div class="empty" id="emptyState"><div class="icon">📹</div><p>Lock a batch name above to start scanning...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>
     </div>
   </div>
   <script>
-    var scanInput = document.getElementById('scanInput');
-    var batchInput = document.getElementById('batchInput');
-    var batchLockBtn = document.getElementById('batchLockBtn');
-    var noBatchWarning = document.getElementById('noBatchWarning');
-    var attGrid = document.getElementById('attGrid');
-    var emptyState = document.getElementById('emptyState');
-    var attendanceList = [];
-    var scannedIds = new Set();
-    var soundEnabled = true;
-    var counter = 0;
-    var batchLocked = false;
-    var currentBatch = '';
-    var today = new Date().toLocaleString('en-IN', { timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric' });
-    batchInput.value = 'Zoom Batch ' + today;
-    setInterval(function() {
-      if (document.activeElement !== scanInput && document.activeElement !== document.getElementById('searchBox') && document.activeElement !== batchInput) { scanInput.focus(); }
-    }, 150);
-    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playBeep(freq, duration, type) {
-      if (!soundEnabled) return;
-      try { var o = audioCtx.createOscillator(); var g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type = type || 'sine'; o.frequency.value = freq; g.gain.setValueAtTime(0.3, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); o.start(); o.stop(audioCtx.currentTime + duration); } catch(e) {}
-    }
-    function playSuccess() { playBeep(880, 0.15); setTimeout(function() { playBeep(1100, 0.2); }, 100); }
-    function playError() { playBeep(300, 0.3, 'square'); }
-    function playDuplicate() { playBeep(600, 0.15); setTimeout(function() { playBeep(400, 0.2); }, 120); }
-    function toggleSound() { soundEnabled = !soundEnabled; var b = document.getElementById('soundBtn'); b.textContent = soundEnabled ? '🔊' : '🔇'; b.classList.toggle('muted', !soundEnabled); }
-    function showFlash(type, icon, sub) { var f = document.getElementById('flash'); document.getElementById('flashIcon').textContent = icon; document.getElementById('flashSub').textContent = sub || ''; f.className = 'flash ' + type + ' show'; setTimeout(function() { f.className = 'flash ' + type; }, 1200); }
-    function updateStats() { var v=0,i=0,d=0; for(var x=0;x<attendanceList.length;x++){if(attendanceList[x].valid&&!attendanceList[x].duplicate)v++;else if(attendanceList[x].duplicate)d++;else i++;} document.getElementById('validCount').textContent=v; document.getElementById('invalidCount').textContent=i; document.getElementById('dupCount').textContent=d; }
-    function getKolkataTime() { return new Date().toLocaleString('en-IN', { timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true }); }
-    function addCard(entry) {
-      if (emptyState) emptyState.style.display = 'none';
-      var c = document.createElement('div'); c.className = 'att-card' + (entry.duplicate ? ' duplicate-card' : ''); c.dataset.name = (entry.name || '').toLowerCase(); c.dataset.id = entry.id;
-      var bh = entry.batch ? '<span class="att-badge batch">' + entry.batch + '</span>' : '';
-      c.innerHTML = '<div class="att-num ' + (entry.valid ? 'valid' : 'invalid') + '">' + entry.sno + '</div><div class="att-info"><div class="att-name">' + (entry.name || '—') + '</div><div class="att-meta"><span>ID: ' + entry.id + '</span>' + (entry.course ? '<span class="att-badge course">' + entry.course + '</span>' : '') + bh + (entry.duplicate ? '<span class="att-badge dup">DUPLICATE</span>' : '') + '</div></div><div class="att-time"><div class="time">' + entry.time + '</div></div>';
-      attGrid.insertBefore(c, attGrid.firstChild);
-    }
-    function lockBatch() { var n = batchInput.value.trim(); if (!n) { noBatchWarning.classList.add('show'); batchInput.focus(); return; } currentBatch = n; batchLocked = true; batchInput.disabled = true; batchLockBtn.textContent = '✅ ' + n; batchLockBtn.classList.add('locked'); scanInput.disabled = false; noBatchWarning.classList.remove('show'); scanInput.focus(); }
-    batchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); lockBatch(); } });
-    scanInput.addEventListener('keydown', async function(e) {
-      if (e.key !== 'Enter') return; e.preventDefault();
-      if (!batchLocked) { noBatchWarning.classList.add('show'); return; }
-      var rawId = scanInput.value.trim(); scanInput.value = ''; if (!rawId) return;
-      var id = rawId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      if (id.length !== 7) { playError(); showFlash('error', '❌', 'Invalid length (' + id.length + '/7)'); counter++; addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch}); updateStats(); return; }
-      if (scannedIds.has(id)) { playDuplicate(); showFlash('duplicate', '⚠️', id + ' — Already Scanned!'); counter++; var orig=null; for(var i=0;i<attendanceList.length;i++){if(attendanceList[i].id===id){orig=attendanceList[i];break;}} addCard({sno:counter,id:id,name:orig?orig.name:'—',valid:true,duplicate:true,course:orig?orig.course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:true,duplicate:true,batch:currentBatch}); updateStats(); return; }
-      try { var res = await fetch('/api/scan', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({barcode_id:id,batch_name:currentBatch}) }); var json = await res.json(); scannedIds.add(id); counter++;
-        if (json.success) { var u = json.data; playSuccess(); showFlash('success', '✅', u.full_name); addCard({sno:counter,id:id,name:u.full_name,valid:true,duplicate:false,course:u.course_type||'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:true,duplicate:false,name:u.full_name,course:u.course_type||'',batch:currentBatch}); }
-        else { playError(); showFlash('error', '❌', json.message || 'Not Found'); addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch}); }
-      } catch(err) { playError(); showFlash('error', '🌐', 'Network Error'); counter++; addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()}); attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch}); }
-      updateStats();
-    });
-    function filterList() { var q = document.getElementById('searchBox').value.toLowerCase(); var cards = attGrid.querySelectorAll('.att-card'); for(var i=0;i<cards.length;i++){var m=cards[i].dataset.name.indexOf(q)!==-1||cards[i].dataset.id.indexOf(q)!==-1;cards[i].style.display=m?'':'none';} }
-    function clearAll() { if(!confirm('Clear all attendance records?'))return; attendanceList=[]; scannedIds.clear(); counter=0; attGrid.innerHTML='<div class="empty" id="emptyState"><div class="icon">📹</div><p>Waiting for first scan...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>'; updateStats(); }
-    function exportCSV() { if(attendanceList.length===0){alert('No records to export');return;} var csv='S.No,ID,Name,Course,Batch,Status,Time\\n'; for(var i=0;i<attendanceList.length;i++){var a=attendanceList[i];var s=a.duplicate?'DUPLICATE':(a.valid?'VALID':'INVALID'); csv+=(i+1)+','+a.id+',"'+(a.name||'—')+'","'+(a.course||'')+'","'+(a.batch||'')+'",'+s+','+(a.time||'')+'\\n';} var b=new Blob([csv],{type:'text/csv'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=(currentBatch||'attendance').replace(/[^a-zA-Z0-9 ]/g,'').replace(/ +/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(u); }
-    document.addEventListener('paste', function(e) { if(document.activeElement===document.getElementById('searchBox'))return; if(!batchLocked)return; var t=(e.clipboardData||window.clipboardData).getData('text'); var c=t.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); if(c.length>=7){scanInput.value=c.slice(0,7);scanInput.focus();if(c.length===7){setTimeout(function(){scanInput.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));},50);}} });
+    var scanInput=document.getElementById('scanInput'),batchInput=document.getElementById('batchInput'),batchLockBtn=document.getElementById('batchLockBtn'),noBatchWarning=document.getElementById('noBatchWarning'),attGrid=document.getElementById('attGrid'),emptyState=document.getElementById('emptyState'),attendanceList=[],scannedIds=new Set(),soundEnabled=true,counter=0,batchLocked=false,currentBatch='';
+    var today=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric'});batchInput.value='Zoom Batch '+today;
+    setInterval(function(){if(document.activeElement!==scanInput&&document.activeElement!==document.getElementById('searchBox')&&document.activeElement!==batchInput)scanInput.focus();},150);
+    var audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    function playBeep(f,d,t){if(!soundEnabled)return;try{var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.type=t||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.3,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.start();o.stop(audioCtx.currentTime+d);}catch(e){}}
+    function playSuccess(){playBeep(880,0.15);setTimeout(function(){playBeep(1100,0.2);},100);}
+    function playError(){playBeep(300,0.3,'square');}
+    function playDuplicate(){playBeep(600,0.15);setTimeout(function(){playBeep(400,0.2);},120);}
+    function toggleSound(){soundEnabled=!soundEnabled;var b=document.getElementById('soundBtn');b.textContent=soundEnabled?'🔊':'🔇';b.classList.toggle('muted',!soundEnabled);}
+    function showFlash(t,i,s){var f=document.getElementById('flash');document.getElementById('flashIcon').textContent=i;document.getElementById('flashSub').textContent=s||'';f.className='flash '+t+' show';setTimeout(function(){f.className='flash '+t;},1200);}
+    function updateStats(){var v=0,i=0,d=0;for(var x=0;x<attendanceList.length;x++){if(attendanceList[x].valid&&!attendanceList[x].duplicate)v++;else if(attendanceList[x].duplicate)d++;else i++;}document.getElementById('validCount').textContent=v;document.getElementById('invalidCount').textContent=i;document.getElementById('dupCount').textContent=d;}
+    function getKolkataTime(){return new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});}
+    function addCard(e){if(emptyState)emptyState.style.display='none';var c=document.createElement('div');c.className='att-card'+(e.duplicate?' duplicate-card':'');c.dataset.name=(e.name||'').toLowerCase();c.dataset.id=e.id;var bh=e.batch?'<span class="att-badge batch">'+e.batch+'</span>':'';c.innerHTML='<div class="att-num '+(e.valid?'valid':'invalid')+'">'+e.sno+'</div><div class="att-info"><div class="att-name">'+(e.name||'—')+'</div><div class="att-meta"><span>ID: '+e.id+'</span>'+(e.course?'<span class="att-badge course">'+e.course+'</span>':'')+bh+(e.duplicate?'<span class="att-badge dup">DUPLICATE</span>':'')+'</div></div><div class="att-time"><div class="time">'+e.time+'</div></div>';attGrid.insertBefore(c,attGrid.firstChild);}
+    function lockBatch(){var n=batchInput.value.trim();if(!n){noBatchWarning.classList.add('show');batchInput.focus();return;}currentBatch=n;batchLocked=true;batchInput.disabled=true;batchLockBtn.textContent='✅ '+n;batchLockBtn.classList.add('locked');scanInput.disabled=false;noBatchWarning.classList.remove('show');scanInput.focus();}
+    batchInput.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();lockBatch();}});
+    scanInput.addEventListener('keydown',async function(e){if(e.key!=='Enter')return;e.preventDefault();if(!batchLocked){noBatchWarning.classList.add('show');return;}var rawId=scanInput.value.trim();scanInput.value='';if(!rawId)return;var id=rawId.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(id.length!==7){playError();showFlash('error','❌','Invalid length ('+id.length+'/7)');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});updateStats();return;}if(scannedIds.has(id)){playDuplicate();showFlash('duplicate','⚠️',id+' — Already Scanned!');counter++;var orig=null;for(var i=0;i<attendanceList.length;i++){if(attendanceList[i].id===id){orig=attendanceList[i];break;}}addCard({sno:counter,id:id,name:orig?orig.name:'—',valid:true,duplicate:true,course:orig?orig.course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:true,batch:currentBatch});updateStats();return;}try{var res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id,batch_name:currentBatch})});var json=await res.json();scannedIds.add(id);counter++;if(json.success){var u=json.data;playSuccess();showFlash('success','✅',u.full_name);addCard({sno:counter,id:id,name:u.full_name,valid:true,duplicate:false,course:u.course_type||'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:false,name:u.full_name,course:u.course_type||'',batch:currentBatch});}else{playError();showFlash('error','❌',json.message||'Not Found');addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}}catch(err){playError();showFlash('error','🌐','Network Error');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}updateStats();});
+    function filterList(){var q=document.getElementById('searchBox').value.toLowerCase();var cards=attGrid.querySelectorAll('.att-card');for(var i=0;i<cards.length;i++){var m=cards[i].dataset.name.indexOf(q)!==-1||cards[i].dataset.id.indexOf(q)!==-1;cards[i].style.display=m?'':'none';}}
+    function clearAll(){if(!confirm('Clear all attendance records?'))return;attendanceList=[];scannedIds.clear();counter=0;attGrid.innerHTML='<div class="empty" id="emptyState"><div class="icon">📹</div><p>Waiting for first scan...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>';updateStats();}
+    function exportCSV(){if(attendanceList.length===0){alert('No records to export');return;}var csv='S.No,ID,Name,Course,Batch,Status,Time\\n';for(var i=0;i<attendanceList.length;i++){var a=attendanceList[i];var s=a.duplicate?'DUPLICATE':(a.valid?'VALID':'INVALID');csv+=(i+1)+','+a.id+',"'+(a.name||'—')+'","'+(a.course||'')+'","'+(a.batch||'')+'",'+s+','+(a.time||'')+'\\n';}var b=new Blob([csv],{type:'text/csv'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=(currentBatch||'attendance').replace(/[^a-zA-Z0-9 ]/g,'').replace(/ +/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(u);}
+    document.addEventListener('paste',function(e){if(document.activeElement===document.getElementById('searchBox'))return;if(!batchLocked)return;var t=(e.clipboardData||window.clipboardData).getData('text');var c=t.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(c.length>=7){scanInput.value=c.slice(0,7);scanInput.focus();if(c.length===7){setTimeout(function(){scanInput.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));},50);}}});
   </script>
 </body>
 </html>`);
@@ -991,39 +855,39 @@ app.get("/join", async (req, res) => {
   <title>Join Zoom - Tushar Bhumkar Institute</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Inter',sans-serif; background:#0a0a0a; color:#e5e5e5; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
-    .container { width:100%; max-width:440px; }
-    .logo-area { text-align:center; margin-bottom:30px; }
-    .logo-area h1 { font-size:14px; font-weight:700; color:#003366; background:#fff; display:inline-block; padding:8px 20px; border-radius:8px; letter-spacing:1px; }
-    .card { background:#151515; border:1px solid #222; border-radius:20px; overflow:hidden; }
-    .card-top { background:linear-gradient(135deg,#1a1a2e,#16213e); padding:30px; text-align:center; }
-    .card-top .icon { font-size:48px; margin-bottom:12px; }
-    .card-top h2 { font-size:22px; font-weight:700; color:#fff; margin-bottom:6px; }
-    .card-top p { font-size:13px; color:#888; }
-    .card-body { padding:30px; }
-    .input-group { margin-bottom:20px; }
-    .input-group label { display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
-    .input-group input { width:100%; padding:16px 20px; font-size:24px; font-family:'Courier New',monospace; font-weight:700; letter-spacing:6px; text-align:center; text-transform:uppercase; background:#0a0a0a; border:2px solid #333; border-radius:14px; color:#fff; outline:none; transition:all 0.3s; }
-    .input-group input:focus { border-color:#00e676; box-shadow:0 0 25px rgba(0,230,118,0.15); }
-    .input-group input::placeholder { color:#444; letter-spacing:2px; font-size:14px; font-weight:400; }
-    .btn-join { width:100%; padding:16px; background:linear-gradient(135deg,#00c853,#009624); border:none; border-radius:14px; color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:all 0.3s; letter-spacing:0.5px; }
-    .btn-join:hover { transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,200,83,0.3); }
-    .btn-join:active { transform:translateY(0); }
-    .btn-join:disabled { background:#333; color:#666; cursor:not-allowed; transform:none; box-shadow:none; }
-    .helper { text-align:center; margin-top:20px; }
-    .helper p { font-size:12px; color:#555; line-height:1.6; }
-    .helper a { color:#448aff; text-decoration:none; }
-    .msg-box { margin-top:20px; padding:14px 18px; border-radius:12px; font-size:13px; font-weight:500; text-align:center; display:none; animation:fadeIn 0.3s; }
-    .msg-box.show { display:block; }
-    .msg-box.error { background:rgba(255,82,82,0.1); border:1px solid rgba(255,82,82,0.3); color:#ff5252; }
-    .msg-box.success { background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.3); color:#00e676; }
-    .msg-box.loading { background:rgba(68,138,255,0.1); border:1px solid rgba(68,138,255,0.3); color:#448aff; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-    .spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(68,138,255,0.3); border-top-color:#448aff; border-radius:50%; animation:spin 0.6s linear infinite; vertical-align:middle; margin-right:8px; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .footer { text-align:center; margin-top:25px; }
-    .footer p { font-size:11px; color:#333; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#0a0a0a;color:#e5e5e5;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+    .container{width:100%;max-width:440px}
+    .logo-area{text-align:center;margin-bottom:30px}
+    .logo-area h1{font-size:14px;font-weight:700;color:#003366;background:#fff;display:inline-block;padding:8px 20px;border-radius:8px;letter-spacing:1px}
+    .card{background:#151515;border:1px solid #222;border-radius:20px;overflow:hidden}
+    .card-top{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:30px;text-align:center}
+    .card-top .icon{font-size:48px;margin-bottom:12px}
+    .card-top h2{font-size:22px;font-weight:700;color:#fff;margin-bottom:6px}
+    .card-top p{font-size:13px;color:#888}
+    .card-body{padding:30px}
+    .input-group{margin-bottom:20px}
+    .input-group label{display:block;font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+    .input-group input{width:100%;padding:16px 20px;font-size:24px;font-family:'Courier New',monospace;font-weight:700;letter-spacing:6px;text-align:center;text-transform:uppercase;background:#0a0a0a;border:2px solid #333;border-radius:14px;color:#fff;outline:none;transition:all 0.3s}
+    .input-group input:focus{border-color:#00e676;box-shadow:0 0 25px rgba(0,230,118,0.15)}
+    .input-group input::placeholder{color:#444;letter-spacing:2px;font-size:14px;font-weight:400}
+    .btn-join{width:100%;padding:16px;background:linear-gradient(135deg,#00c853,#009624);border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.3s;letter-spacing:0.5px}
+    .btn-join:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,200,83,0.3)}
+    .btn-join:active{transform:translateY(0)}
+    .btn-join:disabled{background:#333;color:#666;cursor:not-allowed;transform:none;box-shadow:none}
+    .helper{text-align:center;margin-top:20px}
+    .helper p{font-size:12px;color:#555;line-height:1.6}
+    .helper a{color:#448aff;text-decoration:none}
+    .msg-box{margin-top:20px;padding:14px 18px;border-radius:12px;font-size:13px;font-weight:500;text-align:center;display:none;animation:fadeIn 0.3s}
+    .msg-box.show{display:block}
+    .msg-box.error{background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.3);color:#ff5252}
+    .msg-box.success{background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);color:#00e676}
+    .msg-box.loading{background:rgba(68,138,255,0.1);border:1px solid rgba(68,138,255,0.3);color:#448aff}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(68,138,255,0.3);border-top-color:#448aff;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .footer{text-align:center;margin-top:25px}
+    .footer p{font-size:11px;color:#333}
   </style>
 </head>
 <body>
@@ -1042,44 +906,23 @@ app.get("/join", async (req, res) => {
         </div>
         <button class="btn-join" id="joinBtn" onclick="verifyAndJoin()">Join Meeting →</button>
         <div class="msg-box" id="msgBox"></div>
-        <div class="helper" style="color:#ffff">
+        <div class="helper">
           <p>📋 Your Entry Pass ID is the 7-character code<br>below the barcode on your pass image</p>
-          <p style="margin-top:8px; color:#ffff:">Don't have your ID? <a href="tel:+919156709542" style="color:#fff;text-decoration:none;">📞 Contact Admin</a></p>
-          
+          <p style="margin-top:8px;">Don't have your ID? <a href="tel:+919876543210">📞 Call Support</a></p>
         </div>
       </div>
     </div>
-  <div class="footer" style="color:#ffff"><p>www.tusharbhumkar.com</p></div>
+    <div class="footer">
+      <p>www.tusharbhumkar.com</p>
+      <p style="margin-top:4px;"><a href="tel:+919876543210" style="color:#448aff;text-decoration:none;">📞 Support: +91 98765 43210</a></p>
+    </div>
   </div>
   <script>
-    var idInput = document.getElementById('idInput');
-    var joinBtn = document.getElementById('joinBtn');
-    var msgBox = document.getElementById('msgBox');
-    var zoomUrl = '${zoomUrl}';
-    var verifying = false;
-    idInput.addEventListener('input', function() { this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase(); });
-    idInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); verifyAndJoin(); } });
-    function showMsg(type, html) { msgBox.className = 'msg-box show ' + type; msgBox.innerHTML = html; }
-    function hideMsg() { msgBox.className = 'msg-box'; }
-    async function verifyAndJoin() {
-      if (verifying) return;
-      var id = idInput.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().trim();
-      if (!id) { showMsg('error', '❌ Please enter your Entry Pass ID'); idInput.focus(); return; }
-      if (id.length !== 7) { showMsg('error', '❌ ID must be exactly 7 characters (you entered ' + id.length + ')'); idInput.focus(); return; }
-      verifying = true; joinBtn.disabled = true; joinBtn.textContent = 'Verifying...'; showMsg('loading', '<span class="spinner"></span> Checking your Entry Pass...');
-      try {
-        var res = await fetch('/api/verify-join', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({barcode_id:id, meeting_id:'${m}'}) });
-        var json = await res.json();
-        if (json.success) {
-          showMsg('success', '✅ Welcome ' + json.name + '! Redirecting to Zoom...');
-          joinBtn.textContent = '✅ Verified — Joining...'; joinBtn.style.background = 'linear-gradient(135deg,#00c853,#009624)';
-          setTimeout(function() { window.location.href = zoomUrl; }, 1500);
-        } else {
-          showMsg('error', '❌ ' + (json.message || 'Invalid ID. Contact admin if you think this is wrong.'));
-          joinBtn.disabled = false; joinBtn.textContent = 'Join Meeting →'; verifying = false; idInput.select();
-        }
-      } catch (err) { showMsg('error', '🌐 Network error. Check your internet and try again.'); joinBtn.disabled = false; joinBtn.textContent = 'Join Meeting →'; verifying = false; }
-    }
+    var idInput=document.getElementById('idInput'),joinBtn=document.getElementById('joinBtn'),msgBox=document.getElementById('msgBox'),zoomUrl='${zoomUrl}',verifying=false;
+    idInput.addEventListener('input',function(){this.value=this.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();});
+    idInput.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();verifyAndJoin();}});
+    function showMsg(t,h){msgBox.className='msg-box show '+t;msgBox.innerHTML=h;}
+    async function verifyAndJoin(){if(verifying)return;var id=idInput.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().trim();if(!id){showMsg('error','❌ Please enter your Entry Pass ID');idInput.focus();return;}if(id.length!==7){showMsg('error','❌ ID must be exactly 7 characters (you entered '+id.length+')');idInput.focus();return;}verifying=true;joinBtn.disabled=true;joinBtn.textContent='Verifying...';showMsg('loading','<span class="spinner"></span> Checking your Entry Pass...');try{var res=await fetch('/api/verify-join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id,meeting_id:'${m}'})});var json=await res.json();if(json.success){showMsg('success','✅ Welcome '+json.name+'! Redirecting to Zoom...');joinBtn.textContent='✅ Verified — Joining...';joinBtn.style.background='linear-gradient(135deg,#00c853,#009624)';setTimeout(function(){window.location.href=zoomUrl;},1500);}else{showMsg('error','❌ '+(json.message||'Invalid ID. Contact admin if you think this is wrong.'));joinBtn.disabled=false;joinBtn.textContent='Join Meeting →';verifying=false;idInput.select();}}catch(err){showMsg('error','🌐 Network error. Check your internet and try again.');joinBtn.disabled=false;joinBtn.textContent='Join Meeting →';verifying=false;}}
     idInput.focus();
   </script>
 </body>
@@ -1108,14 +951,12 @@ app.post("/api/verify-join", async (req, res) => {
     const u = ur.rows[0];
     console.log("✅ Zoom join approved:", u.full_name, "| ID:", barcode_id, "| Meeting:", meeting_id);
 
-    // Log to scans table
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info, batch_name, scanned_at)
        VALUES ($1, $2, $3, $4, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`,
       [barcode_id, u.course_type || 'Unknown', 'Zoom Join Gate', 'Zoom Meeting: ' + (meeting_id || 'unknown')]
     );
 
-    // Update users.date (same as scan endpoint)
     const kolkataTime = await pool.query(
       `SELECT TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), 'DD/MM/YYYY, HH12:MI:SS AM') AS kolkata_now`
     );
