@@ -308,11 +308,18 @@ async function generateFinalImage(id) {
     ctx.drawImage(qrImage, cX - (qs / 2), cY, qs, qs);
 
     const bY = cY + qs + 25;
-    ctx.drawImage(barcodeImg, 50, bY, 600, 100);
+    ctx.drawImage(barcodeImg, 50, bY, 600, 90);
 
+    // ✅ BIG, BOLD, READABLE ID TEXT BELOW BARCODE
     ctx.fillStyle = "#000";
-    ctx.font = "italic 20px Arial";
-    ctx.fillText("Scan QR or Barcode at Entry", cX, bY + 130);
+    ctx.font = "bold 44px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(id, cX, bY + 135);
+
+    // helper message below ID
+    ctx.fillStyle = "#444";
+    ctx.font = "italic 18px Arial";
+    ctx.fillText("Scan QR or Barcode at Entry", cX, bY + 165);
 
     const fp = path.join(tempDir, `${id}-final.png`);
     fs.writeFileSync(fp, canvas.toBuffer("image/png", { compressionLevel: 9 }));
@@ -338,7 +345,10 @@ app.post("/create", async (req, res) => {
     );
 
     fs.writeFileSync(path.join(tempDir, `${id}-qr.png`), await QRCode.toBuffer(`https://google-form-kebh.onrender.com/user/${id}`, { width: 600, margin: 2, errorCorrectionLevel: 'H' }));
-    fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 }));
+    
+    // ✅ Barcode generated WITHOUT default text (we draw it manually on canvas)
+    fs.writeFileSync(path.join(tempDir, `${id}-barcode.png`), await bwipjs.toBuffer({ bcid: "code128", text: id, scale: 4, height: 35, includetext: false, padding: 10 }));
+    
     await generateFinalImage(id);
 
     console.log("✅ User created:", id, fullName, "| created_at set to Asia/Kolkata time");
@@ -372,7 +382,8 @@ app.post("/send-email", async (req, res) => {
       }
 
       if (!fs.existsSync(barcodeImagePath)) {
-        const barBuffer = await bwipjs.toBuffer({ bcid: "code128", text: id, alttext: id, scale: 3, height: 25, includetext: true, textxalign: "center", padding: 10 });
+        // ✅ Barcode generated WITHOUT default text
+        const barBuffer = await bwipjs.toBuffer({ bcid: "code128", text: id, scale: 4, height: 35, includetext: false, padding: 10 });
         fs.writeFileSync(barcodeImagePath, barBuffer);
       }
 
@@ -889,7 +900,7 @@ app.get("/attendance", async (req, res) => {
     function addCard(e){if(emptyState)emptyState.style.display='none';var c=document.createElement('div');c.className='att-card'+(e.duplicate?' duplicate-card':'');c.dataset.name=(e.name||'').toLowerCase();c.dataset.id=e.id;var bh=e.batch?'<span class="att-badge batch">'+e.batch+'</span>':'';c.innerHTML='<div class="att-num '+(e.valid?'valid':'invalid')+'">'+e.sno+'</div><div class="att-info"><div class="att-name">'+(e.name||'—')+'</div><div class="att-meta"><span>ID: '+e.id+'</span>'+(e.course?'<span class="att-badge course">'+e.course+'</span>':'')+bh+(e.duplicate?'<span class="att-badge dup">DUPLICATE</span>':'')+'</div></div><div class="att-time"><div class="time">'+e.time+'</div></div>';attGrid.insertBefore(c,attGrid.firstChild);}
     function lockBatch(){var n=batchInput.value.trim();if(!n){noBatchWarning.classList.add('show');batchInput.focus();return;}currentBatch=n;batchLocked=true;batchInput.disabled=true;batchLockBtn.textContent='✅ '+n;batchLockBtn.classList.add('locked');scanInput.disabled=false;noBatchWarning.classList.remove('show');scanInput.focus();}
     batchInput.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();lockBatch();}});
-    scanInput.addEventListener('keydown',async function(e){if(e.key!=='Enter')return;e.preventDefault();if(!batchLocked){noBatchWarning.classList.add('show');return;}var rawId=scanInput.value.trim();scanInput.value='';if(!rawId)return;var id=rawId.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(id.length!==7){playError();showFlash('error','❌','Invalid length ('+id.length+'/7)');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});updateStats();return;}if(scannedIds.has(id)){playDuplicate();showFlash('duplicate','⚠️',id+' — Already Scanned!');counter++;var orig=null;for(var i=0;i<attendanceList.length;i++){if(attendanceList[i].id===id){orig=attendanceList[i];break;}}addCard({sno:counter,id:id,name:orig?orig.name:'—',valid:true,duplicate:true,course:orig?orig.course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:true,batch:currentBatch});updateStats();return;}try{var res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id,batch_name:currentBatch})});var json=await res.json();scannedIds.add(id);counter++;if(json.success){var u=json.data;playSuccess();showFlash('success','✅',u.full_name);addCard({sno:counter,id:id,name:u.full_name,valid:true,duplicate:false,course:u.course_type||'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:false,name:u.full_name,course:u.course_type||'',batch:currentBatch});}else{playError();showFlash('error','❌',json.message||'Not Found');addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}}catch(err){playError();showFlash('error','🌐','Network Error');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}updateStats();});
+    scanInput.addEventListener('keydown',async function(e){if(e.key!=='enter')return;e.preventDefault();if(!batchLocked){noBatchWarning.classList.add('show');return;}var rawId=scanInput.value.trim();scanInput.value='';if(!rawId)return;var id=rawId.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(id.length!==7){playError();showFlash('error','❌','Invalid length ('+id.length+'/7)');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});updateStats();return;}if(scannedIds.has(id)){playDuplicate();showFlash('duplicate','⚠️',id+' — Already Scanned!');counter++;var orig=null;for(var i=0;i<attendanceList.length;i++){if(attendanceList[i].id===id){orig=attendanceList[i];break;}}addCard({sno:counter,id:id,name:orig?orig.name:'—',valid:true,duplicate:true,course:orig?orig.course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:true,batch:currentBatch});updateStats();return;}try{var res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id,batch_name:currentBatch})});var json=await res.json();scannedIds.add(id);counter++;if(json.success){var u=json.data;playSuccess();showFlash('success','✅',u.full_name);addCard({sno:counter,id:id,name:u.full_name,valid:true,duplicate:false,course:u.course_type||'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:false,name:u.full_name,course:u.course_type||'',batch:currentBatch});}else{playError();showFlash('error','❌',json.message||'Not Found');addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}}catch(err){playError();showFlash('error','🌐','Network Error');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}updateStats();});
     function filterList(){var q=document.getElementById('searchBox').value.toLowerCase();var cards=attGrid.querySelectorAll('.att-card');for(var i=0;i<cards.length;i++){var m=cards[i].dataset.name.indexOf(q)!==-1||cards[i].dataset.id.indexOf(q)!==-1;cards[i].style.display=m?'':'none';}}
     function clearAll(){if(!confirm('Clear all attendance records?'))return;attendanceList=[];scannedIds.clear();counter=0;attGrid.innerHTML='<div class="empty" id="emptyState"><div class="icon">📹</div><p>Waiting for first scan...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>';updateStats();}
     function exportCSV(){if(attendanceList.length===0){alert('No records to export');return;}var csv='S.No,ID,Name,Course,Batch,Status,Time\\n';for(var i=0;i<attendanceList.length;i++){var a=attendanceList[i];var s=a.duplicate?'DUPLICATE':(a.valid?'VALID':'INVALID');csv+=(i+1)+','+a.id+',"'+(a.name||'—')+'","'+(a.course||'')+'","'+(a.batch||'')+'",'+s+','+(a.time||'')+'\\n';}var b=new Blob([csv],{type:'text/csv'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=(currentBatch||'attendance').replace(/[^a-zA-Z0-9 ]/g,'').replace(/ +/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(u);}
