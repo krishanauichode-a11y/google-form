@@ -16,7 +16,13 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-app.use(session({ secret: "super-secret-key", resave: false, saveUninitialized: true }));
+// ✅ UPDATED SESSION CONFIG: Allows cookie to stay alive for up to 7 days
+app.use(session({ 
+  secret: "super-secret-key", 
+  resave: false, 
+  saveUninitialized: true,
+  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 days in milliseconds
+}));
 
 // ==================================================================================
 // 🌐 NODE.JS DATABASE (For Users, Scans, Passes)
@@ -920,6 +926,17 @@ app.get("/join", async (req, res) => {
 
   const zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
 
+  // ✅ AUTO-LOGIN: Check if student session is valid and not expired
+  if (req.session.studentAccess && req.session.studentAccess.expiresAt > Date.now()) {
+    console.log(`⚡ Auto-login: ${req.session.studentAccess.name} bypassed ID entry.`);
+    return res.redirect(zoomUrl);
+  }
+
+  // Clear expired session
+  if (req.session.studentAccess) {
+    req.session.studentAccess = null;
+  }
+
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1022,6 +1039,26 @@ app.post("/api/verify-join", async (req, res) => {
 
     const u = ur.rows[0];
     console.log("✅ Zoom join approved:", u.full_name, "| ID:", barcode_id, "| Meeting:", meeting_id);
+
+    // ✅ SET LOGIN DURATION BASED ON COURSE TYPE
+    const courseTypeStr = (u.course_type || "").toLowerCase();
+    let durationDays = 2; // Default to 2 days for Basic Course
+    
+    if (courseTypeStr.includes('advance')) {
+      durationDays = 7; // 7 days for Advance Course
+    }
+    
+    // Set expiry timestamp
+    const expiresAt = Date.now() + (durationDays * 24 * 60 * 60 * 1000);
+    
+    // Save to session
+    req.session.studentAccess = {
+      id: u.id,
+      name: u.full_name,
+      expiresAt: expiresAt
+    };
+    
+    console.log(`🔐 Session locked for ${u.full_name} for ${durationDays} days.`);
 
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info, batch_name, scanned_at)
