@@ -464,16 +464,14 @@ app.get("/attendance", async (req, res) => {
 
 // ==================================================================================
 // 🚪 ZOOM GATE - Student enters ID before joining Zoom meeting
+// 🔐 ONE DEVICE LOCK: Each pass can only be used from ONE device
 // ==================================================================================
 app.get("/join", async (req, res) => {
-  // ✅ Grab 'type' from the URL (either 'basic' or 'advance')
   const { m, pwd, omn, type } = req.query;
 
   if (!m) return res.send("❌ Missing meeting ID. Share this link: https://google-form-kebh.onrender.com/join?m=7730187149&pwd=HS7vJmrclzzVqOGz3zMD1to1aGfCGs.1&omn=85355860081&type=basic");
 
   const zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
-  
-  // Determine if the link is for advance or basic
   const accessType = type === 'advance' ? 'advance' : 'basic';
 
   // ✅ AUTO-LOGIN: Check if student session is valid and not expired
@@ -527,6 +525,7 @@ app.get("/join", async (req, res) => {
     @keyframes spin{to{transform:rotate(360deg)}}
     .footer{text-align:center;margin-top:25px}
     .footer p{font-size:11px;color:#333}
+    .security-note{margin-top:15px;padding:10px 14px;background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.25);border-radius:10px;font-size:11px;color:#ffaa55;text-align:center;line-height:1.5}
   </style>
 </head>
 <body>
@@ -545,9 +544,10 @@ app.get("/join", async (req, res) => {
         </div>
         <button class="btn-join" id="joinBtn" onclick="verifyAndJoin()">Join Meeting →</button>
         <div class="msg-box" id="msgBox"></div>
+        <div class="security-note">🔒 For security, your Entry Pass is locked to one device only. Sharing passes is not allowed.</div>
         <div class="helper">
           <p>📋 Your Entry Pass ID is the 7-character code<br>below the barcode on your pass image</p>
-          <p style="margin-top:8px;">Don't have your ID? <a href="tel:+919156709542">📞 Call Support</a></p>
+          <p style="margin-top:8px;">Locked out / changed device? <a href="tel:+919156709542">📞 Call Support</a></p>
         </div>
       </div>
     </div>
@@ -556,12 +556,160 @@ app.get("/join", async (req, res) => {
     </div>
   </div>
   <script>
-    var idInput=document.getElementById('idInput'),joinBtn=document.getElementById('joinBtn'),msgBox=document.getElementById('msgBox'),zoomUrl='${zoomUrl}',verifying=false;
-    var accessType='${accessType}'; // ✅ Grab access type from URL
-    idInput.addEventListener('input',function(){this.value=this.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();});
-    idInput.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();verifyAndJoin();}});
+    var idInput=document.getElementById('idInput'),
+        joinBtn=document.getElementById('joinBtn'),
+        msgBox=document.getElementById('msgBox'),
+        zoomUrl='${zoomUrl}',
+        verifying=false;
+    var accessType='${accessType}';
+
+    idInput.addEventListener('input',function(){
+      this.value=this.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+    });
+    idInput.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){e.preventDefault();verifyAndJoin();}
+    });
+
     function showMsg(t,h){msgBox.className='msg-box show '+t;msgBox.innerHTML=h;}
-    async function verifyAndJoin(){if(verifying)return;var id=idInput.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().trim();if(!id){showMsg('error','❌ Please enter your Entry Pass ID');idInput.focus();return;}if(id.length!==7){showMsg('error','❌ ID must be exactly 7 characters (you entered '+id.length+')');idInput.focus();return;}verifying=true;joinBtn.disabled=true;joinBtn.textContent='Verifying...';showMsg('loading','<span class="spinner"></span> Checking your Entry Pass...');try{var res=await fetch('/api/verify-join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id,meeting_id:'${m}',access_type:accessType})});var json=await res.json();if(json.success){showMsg('success','✅ Welcome '+json.name+'! Redirecting to Zoom...');joinBtn.textContent='✅ Verified — Joining...';joinBtn.style.background='linear-gradient(135deg,#00c853,#009624)';setTimeout(function(){window.location.href=zoomUrl;},1500);}else{showMsg('error','❌ '+(json.message||'Invalid ID. Contact admin if you think this is wrong.'));joinBtn.disabled=false;joinBtn.textContent='Join Meeting →';verifying=false;idInput.select();}}catch(err){showMsg('error','🌐 Network error. Check your internet and try again.');joinBtn.disabled=false;joinBtn.textContent='Join Meeting →';verifying=false;}}
+
+    // ============================================================
+    // 🔐 DEVICE FINGERPRINT GENERATOR
+    // Creates a unique ID for this device using hardware + browser signals
+    // ============================================================
+    async function generateDeviceFingerprint() {
+      try {
+        var components = [];
+
+        // 1. User Agent (browser + OS version)
+        components.push(navigator.userAgent);
+
+        // 2. Screen properties (resolution, color depth)
+        components.push(screen.width + 'x' + screen.height + 'x' + screen.colorDepth);
+        components.push(screen.availWidth + 'x' + screen.availHeight);
+
+        // 3. Timezone
+        try {
+          components.push(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        } catch(e) { components.push('tz-unknown'); }
+
+        // 4. Language
+        components.push(navigator.language + '|' + (navigator.languages || []).join(','));
+
+        // 5. Hardware info
+        components.push(navigator.platform || '');
+        components.push(navigator.hardwareConcurrency || '');
+        components.push(navigator.deviceMemory || '');
+        components.push(navigator.maxTouchPoints || 0);
+
+        // 6. Canvas fingerprint (very unique to GPU/device)
+        try {
+          var canvas = document.createElement('canvas');
+          canvas.width = 200; canvas.height = 50;
+          var ctx = canvas.getContext('2d');
+          ctx.textBaseline = 'top';
+          ctx.font = '14px Arial';
+          ctx.fillStyle = '#f60';
+          ctx.fillRect(125,1,62,20);
+          ctx.fillStyle = '#069';
+          ctx.fillText('TusharBhumkar🔥🔒2024', 2, 15);
+          ctx.fillStyle = 'rgba(102,204,0,0.7)';
+          ctx.fillText('TusharBhumkar🔥🔒2024', 4, 17);
+          components.push(canvas.toDataURL());
+        } catch(e) { components.push('canvas-err'); }
+
+        // 7. WebGL fingerprint (GPU vendor + renderer)
+        try {
+          var c2 = document.createElement('canvas');
+          var gl = c2.getContext('webgl') || c2.getContext('experimental-webgl');
+          if (gl) {
+            var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+            if (dbg) {
+              components.push(gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL));
+              components.push(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL));
+            }
+          }
+        } catch(e) {}
+
+        // 8. Timezone offset
+        components.push(new Date().getTimezoneOffset());
+
+        // 9. Cookie / DNT preferences
+        components.push(navigator.cookieEnabled);
+        components.push(navigator.doNotTrack);
+
+        // Hash all components together (double hash for uniqueness)
+        var raw = components.join('|||');
+        var hash = 0;
+        for (var i = 0; i < raw.length; i++) {
+          var ch = raw.charCodeAt(i);
+          hash = ((hash << 5) - hash) + ch;
+          hash = hash & hash;
+        }
+        var hash2 = 5381;
+        for (var j = 0; j < raw.length; j++) {
+          hash2 = ((hash2 << 5) + hash2) + raw.charCodeAt(j);
+        }
+        var fingerprint = 'fp_' + Math.abs(hash).toString(36) + '_' + Math.abs(hash2).toString(36) + '_' + raw.length.toString(36);
+        return fingerprint;
+      } catch(e) {
+        // Fallback fingerprint
+        return 'fp_fallback_' + btoa(navigator.userAgent + screen.width).substring(0, 40);
+      }
+    }
+
+    async function verifyAndJoin() {
+      if (verifying) return;
+      var id = idInput.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().trim();
+
+      if (!id) { showMsg('error','❌ Please enter your Entry Pass ID'); idInput.focus(); return; }
+      if (id.length !== 7) {
+        showMsg('error','❌ ID must be exactly 7 characters (you entered ' + id.length + ')');
+        idInput.focus(); return;
+      }
+
+      verifying = true;
+      joinBtn.disabled = true;
+      joinBtn.textContent = 'Verifying...';
+      showMsg('loading','<span class="spinner"></span> Verifying device & Entry Pass...');
+
+      try {
+        // 🔐 Generate device fingerprint first
+        var fingerprint = await generateDeviceFingerprint();
+        console.log('Device fingerprint:', fingerprint);
+
+        var res = await fetch('/api/verify-join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barcode_id: id,
+            meeting_id: '${m}',
+            access_type: accessType,
+            device_fingerprint: fingerprint
+          })
+        });
+
+        var json = await res.json();
+
+        if (json.success) {
+          showMsg('success', '✅ Welcome ' + json.name + '! Redirecting to Zoom...');
+          joinBtn.textContent = '✅ Verified — Joining...';
+          joinBtn.style.background = 'linear-gradient(135deg,#00c853,#009624)';
+          setTimeout(function() { window.location.href = zoomUrl; }, 1500);
+        } else {
+          showMsg('error', '❌ ' + (json.message || 'Invalid ID. Contact admin if you think this is wrong.'));
+          joinBtn.disabled = false;
+          joinBtn.textContent = 'Join Meeting →';
+          verifying = false;
+          idInput.select();
+        }
+      } catch(err) {
+        showMsg('error', '🌐 Network error. Check your internet and try again.');
+        joinBtn.disabled = false;
+        joinBtn.textContent = 'Join Meeting →';
+        verifying = false;
+      }
+    }
+
     idInput.focus();
   </script>
 </body>
@@ -569,18 +717,27 @@ app.get("/join", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ VERIFY JOIN - Checks ID, logs to scans, sets 2 or 7 day session based on LINK
+// ✅ VERIFY JOIN - DEVICE-LOCKED LOGIN (One Device Per Pass)
 // ==================================================================================
 app.post("/api/verify-join", async (req, res) => {
   try {
-    let { barcode_id, meeting_id, access_type } = req.body;
+    let { barcode_id, meeting_id, access_type, device_fingerprint } = req.body;
     barcode_id = String(barcode_id || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    device_fingerprint = String(device_fingerprint || "").slice(0, 255);
 
     if (!barcode_id || barcode_id.length !== 7) {
       return res.json({ success: false, message: "ID must be exactly 7 characters" });
     }
 
-    const ur = await pool.query("SELECT id, full_name, course_type FROM users WHERE id=$1", [barcode_id]);
+    if (!device_fingerprint || device_fingerprint.length < 20) {
+      return res.json({ success: false, message: "Could not verify device. Please refresh the page and try again." });
+    }
+
+    // ✅ Get user record (now including device_fingerprint)
+    const ur = await pool.query(
+      "SELECT id, full_name, course_type, device_fingerprint, device_bound_at FROM users WHERE id=$1",
+      [barcode_id]
+    );
 
     if (ur.rows.length === 0) {
       console.log("❌ Zoom join denied - ID not found:", barcode_id, "| Meeting:", meeting_id);
@@ -588,31 +745,53 @@ app.post("/api/verify-join", async (req, res) => {
     }
 
     const u = ur.rows[0];
+
+    // ============================================================
+    // 🔐 DEVICE LOCK CHECK - Core of one-device-per-pass
+    // ============================================================
+    if (u.device_fingerprint) {
+      // Device already bound — verify it matches
+      if (u.device_fingerprint !== device_fingerprint) {
+        console.log(`🚫 DEVICE MISMATCH: ${u.full_name} (${barcode_id}) tried from different device. Bound: ${u.device_fingerprint.substring(0,30)}... | Tried: ${device_fingerprint.substring(0,30)}...`);
+        return res.json({
+          success: false,
+          message: "🔒 This Entry Pass is already locked to another device. Sharing passes is not allowed. If this is your device, please call +91 9156709542."
+        });
+      }
+      // ✅ Same device — allow
+      console.log(`✅ Device match: ${u.full_name} rejoined from same device`);
+    } else {
+      // 🆕 First time — bind this device to the pass forever
+      await pool.query(
+        "UPDATE users SET device_fingerprint=$1, device_bound_at=NOW() WHERE id=$2",
+        [device_fingerprint, barcode_id]
+      );
+      console.log(`🔒 Device bound to ${u.full_name} (${barcode_id}) — first time login`);
+    }
+
     console.log("✅ Zoom join approved:", u.full_name, "| ID:", barcode_id, "| Meeting:", meeting_id);
 
-    // ✅ SET LOGIN DURATION BASED ON THE LINK CLICKED (not database course_type)
-    let durationDays = 2; // Default to 2 days
-    
-    if (access_type === 'advance') {
-      durationDays = 7; // 7 days if they clicked the advance link
-    }
-    
-    // Set expiry timestamp
+    // ✅ Set login duration based on link type
+    let durationDays = (access_type === 'advance') ? 7 : 2;
     const expiresAt = Date.now() + (durationDays * 24 * 60 * 60 * 1000);
-    
+
     // Save to session
     req.session.studentAccess = {
       id: u.id,
       name: u.full_name,
-      expiresAt: expiresAt
+      expiresAt: expiresAt,
+      device_fingerprint: device_fingerprint
     };
-    
+
     console.log(`🔐 Session locked for ${u.full_name} for ${durationDays} days via ${access_type} link.`);
 
+    // Log the scan
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info, batch_name, scanned_at)
        VALUES ($1, $2, $3, $4, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`,
-      [barcode_id, u.course_type || 'Unknown', 'Zoom Join Gate', 'Zoom Meeting: ' + (meeting_id || 'unknown')]
+      [barcode_id, u.course_type || 'Unknown',
+       'Zoom Join Gate (Device: ' + device_fingerprint.substring(0, 16) + '...)',
+       'Zoom Meeting: ' + (meeting_id || 'unknown')]
     );
 
     const kolkataTime = await pool.query(
@@ -628,11 +807,67 @@ app.post("/api/verify-join", async (req, res) => {
   }
 });
 
+// ==================================================================================
+// ✅ ADMIN: Reset Device Binding for a Pass (when student changes phone)
+// ==================================================================================
+app.get("/api/reset-device/:id", async (req, res) => {
+  try {
+    if (!checkAdmin(req, res)) return;
+
+    const { id } = req.params;
+    const cleanId = String(id).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+
+    if (!cleanId || cleanId.length !== 7) {
+      return res.status(400).json({ success: false, message: "Invalid ID format (need 7 chars)" });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET device_fingerprint = NULL, device_bound_at = NULL WHERE id = $1 RETURNING full_name, id",
+      [cleanId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: "User not found with ID: " + cleanId });
+    }
+
+    console.log(`🔓 Device binding reset for ${result.rows[0].full_name} (${cleanId})`);
+    res.json({
+      success: true,
+      message: `✅ Device binding reset for ${result.rows[0].full_name} (${cleanId}). Student can now login from a new device.`
+    });
+  } catch (e) {
+    console.error("Reset device error:", e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ==================================================================================
+// ✅ ADMIN: List all device-bound users (for monitoring)
+// ==================================================================================
+app.get("/api/device-bound-users", async (req, res) => {
+  try {
+    if (!checkAdmin(req, res)) return;
+
+    const result = await pool.query(
+      `SELECT id, full_name, phone, course_type, device_fingerprint, 
+              TO_CHAR(device_bound_at, 'DD Mon YYYY, HH12:MI AM') as bound_at
+       FROM users 
+       WHERE device_fingerprint IS NOT NULL 
+       ORDER BY device_bound_at DESC`
+    );
+
+    res.json({ success: true, count: result.rows.length, data: result.rows });
+  } catch (e) {
+    console.error("List device-bound error:", e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
 
 // ==================================================================================
-// ✅ DB INIT 
+// ✅ DB INIT
 // ==================================================================================
 async function initializeDatabase() {
   const client = await pool.connect();
@@ -660,6 +895,26 @@ async function initializeDatabase() {
       END $$;
     `);
 
+    // ✅ NEW: Add device_fingerprint column for one-device lock
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name = 'users' AND column_name = 'device_fingerprint') THEN
+          ALTER TABLE users ADD COLUMN device_fingerprint VARCHAR(255);
+        END IF;
+      END $$;
+    `);
+
+    // ✅ NEW: Add device_bound_at column (when device was first bound)
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name = 'users' AND column_name = 'device_bound_at') THEN
+          ALTER TABLE users ADD COLUMN device_bound_at TIMESTAMP WITH TIME ZONE;
+        END IF;
+      END $$;
+    `);
+
     await client.query(`CREATE TABLE IF NOT EXISTS scans (
       id SERIAL PRIMARY KEY, barcode_id VARCHAR(7) NOT NULL, course_type VARCHAR(255), scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, device_info TEXT, batch_name VARCHAR(255)
     );`);
@@ -676,7 +931,7 @@ async function initializeDatabase() {
       id VARCHAR(7) PRIMARY KEY, ref_id VARCHAR(50), full_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(20), raw_data JSONB, received_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`);
 
-    console.log("✅ Node.js DB tables ready.");
+    console.log("✅ Node.js DB tables ready (with device_fingerprint + device_bound_at columns).");
 
   } catch (err) {
     console.error("DB Init Error:", err);
