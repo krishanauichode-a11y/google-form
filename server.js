@@ -465,13 +465,27 @@ app.get("/attendance", async (req, res) => {
 // ==================================================================================
 // 🚪 ZOOM GATE - Student enters ID before joining Zoom meeting
 // 🔐 ONE DEVICE LOCK: Each pass can only be used from ONE device
+// Supports: Registration links (?reg=TOKEN) AND Direct join links (?m=ID&pwd=PASS)
 // ==================================================================================
 app.get("/join", async (req, res) => {
-  const { m, pwd, omn, type } = req.query;
+  const { m, pwd, omn, type, reg } = req.query;
 
-  if (!m) return res.send("❌ Missing meeting ID. Share this link: https://google-form-kebh.onrender.com/join?m=7730187149&pwd=HS7vJmrclzzVqOGz3zMD1to1aGfCGs.1&omn=85355860081&type=basic");
+  // ✅ Build Zoom URL based on type of meeting link
+  let zoomUrl = '';
+  let meetingLabel = '';
 
-  const zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
+  if (reg) {
+    // 🔹 Registration-based meeting (e.g. https://us06web.zoom.us/meeting/register/038cejC1R7KLusQii328oA)
+    zoomUrl = `https://us06web.zoom.us/meeting/register/${reg}`;
+    meetingLabel = 'Registration: ' + reg;
+  } else if (m) {
+    // 🔹 Direct join meeting (meeting ID + password)
+    zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
+    meetingLabel = 'Meeting: ' + m;
+  } else {
+    return res.send("❌ Missing meeting info. Share either:<br><br>📍 Registration link:<br>https://google-form-kebh.onrender.com/join?reg=038cejC1R7KLusQii328oA&type=basic<br><br>📍 OR Direct join link:<br>https://google-form-kebh.onrender.com/join?m=7730187149&pwd=PASSWORD&type=basic");
+  }
+
   const accessType = type === 'advance' ? 'advance' : 'basic';
 
   // ✅ AUTO-LOGIN: Check if student session is valid and not expired
@@ -560,6 +574,7 @@ app.get("/join", async (req, res) => {
         joinBtn=document.getElementById('joinBtn'),
         msgBox=document.getElementById('msgBox'),
         zoomUrl='${zoomUrl}',
+        meetingLabel='${meetingLabel}',
         verifying=false;
     var accessType='${accessType}';
 
@@ -682,7 +697,7 @@ app.get("/join", async (req, res) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             barcode_id: id,
-            meeting_id: '${m}',
+            meeting_id: meetingLabel,
             access_type: accessType,
             device_fingerprint: fingerprint
           })
@@ -772,7 +787,7 @@ app.post("/api/verify-join", async (req, res) => {
     console.log("✅ Zoom join approved:", u.full_name, "| ID:", barcode_id, "| Meeting:", meeting_id);
 
     // ✅ Set login duration based on link type
-    let durationDays = (access_type === 'advance') ? 7 : 2;
+    let durationDays = (access_type === 'advance') ? 7 : 3;
     const expiresAt = Date.now() + (durationDays * 24 * 60 * 60 * 1000);
 
     // Save to session
