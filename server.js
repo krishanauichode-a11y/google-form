@@ -16,7 +16,6 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// ✅ Session config: allows cookie to stay alive for up to 7 days
 app.use(session({ 
   secret: "super-secret-key", 
   resave: false, 
@@ -25,7 +24,7 @@ app.use(session({
 }));
 
 // ==================================================================================
-// 🌐 NODE.JS DATABASE (For Users, Scans, Passes)
+// 🌐 NODE.JS DATABASE
 // ==================================================================================
 const pool = new Pool({
   user: "postgres.swknmxqcgoobxxjmrspz",
@@ -190,7 +189,7 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 // ==================================================================================
-// ✅ SCAN ENDPOINT 
+// ✅ SCAN ENDPOINT
 // ==================================================================================
 app.post("/api/scan", async (req, res) => {
   try {
@@ -459,13 +458,14 @@ app.get("/api/scans", async (req, res) => {
 // ==================================================================================
 app.get("/attendance", async (req, res) => {
   if (!checkAdmin(req, res)) return;
-  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Zoom Batch Attendance</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0a0a0a;color:#e5e5e5;min-height:100vh}.header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:20px 30px;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px}.header h1{font-size:22px;font-weight:700}.header h1 span{color:#00e676}.header-stats{display:flex;gap:20px;flex-wrap:wrap}.stat-box{background:rgba(255,255,255,0.05);border:1px solid #333;border-radius:12px;padding:10px 20px;text-align:center;min-width:100px}.stat-box .num{font-size:28px;font-weight:800}.stat-box .lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:2px}.stat-box.green .num{color:#00e676}.stat-box.red .num{color:#ff5252}.stat-box.blue .num{color:#448aff}.batch-section{padding:18px 30px;background:#0d0d0d;border-bottom:1px solid #222}.batch-row{display:flex;gap:12px;max-width:700px;margin:0 auto;align-items:center}.batch-row label{font-size:13px;color:#888;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:1px}.batch-row input{flex:1;padding:12px 18px;font-size:15px;background:#1a1a1a;border:2px solid #333;border-radius:10px;color:#fff;outline:none;transition:border-color 0.2s}.batch-row input:focus{border-color:#ff9800;box-shadow:0 0 15px rgba(255,152,0,0.15)}.batch-row input::placeholder{color:#444}.batch-lock-btn{padding:12px 18px;background:rgba(255,152,0,0.1);border:2px solid #ff9800;border-radius:10px;color:#ff9800;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;text-transform:uppercase;letter-spacing:0.5px}.batch-lock-btn:hover{background:#ff9800;color:#000}.batch-lock-btn.locked{background:rgba(0,230,118,0.1);border-color:#00e676;color:#00e676;cursor:default}.input-section{padding:25px 30px;background:#111;border-bottom:1px solid #222}.input-row{display:flex;gap:12px;max-width:700px;margin:0 auto}.input-row input{flex:1;padding:16px 24px;font-size:22px;font-family:'Courier New',monospace;font-weight:700;letter-spacing:4px;text-align:center;text-transform:uppercase;background:#1a1a1a;border:2px solid #333;border-radius:14px;color:#fff;outline:none;transition:border-color 0.2s}.input-row input:focus{border-color:#00e676;box-shadow:0 0 20px rgba(0,230,118,0.15)}.input-row input::placeholder{color:#555;letter-spacing:1px;font-size:16px;font-weight:400}.input-row input:disabled{opacity:0.3;cursor:not-allowed}.btn-clear{padding:16px 24px;background:#2a1a1a;border:2px solid #ff5252;border-radius:14px;color:#ff5252;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap}.btn-clear:hover{background:#ff5252;color:#fff}.instructions{max-width:700px;margin:0 auto;display:flex;gap:20px;margin-top:15px;flex-wrap:wrap;justify-content:center}.inst-chip{background:rgba(255,255,255,0.04);border:1px solid #2a2a2a;border-radius:20px;padding:6px 14px;font-size:12px;color:#888;display:flex;align-items:center;gap:6px}.inst-chip .dot{width:6px;height:6px;border-radius:50%;background:#00e676}.flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);z-index:1000;padding:30px 60px;border-radius:20px;font-size:28px;font-weight:800;text-align:center;pointer-events:none;transition:transform 0.15s ease-out,opacity 0.3s;opacity:0}.flash.show{transform:translate(-50%,-50%) scale(1);opacity:1}.flash.success{background:rgba(0,230,118,0.95);color:#000;box-shadow:0 0 60px rgba(0,230,118,0.5)}.flash.error{background:rgba(255,82,82,0.95);color:#fff;box-shadow:0 0 60px rgba(255,82,82,0.5)}.flash.duplicate{background:rgba(255,193,7,0.95);color:#000;box-shadow:0 0 60px rgba(255,193,7,0.5)}.flash .sub{font-size:14px;font-weight:400;margin-top:5px;opacity:0.8}.list-section{padding:20px 30px}.list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px}.list-header h2{font-size:16px;color:#888;font-weight:500}.search-box{padding:8px 16px;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;outline:none;width:200px}.search-box:focus{border-color:#00e676}.attendance-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}.att-card{background:#151515;border:1px solid #222;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:all 0.2s;animation:slideIn 0.3s ease-out}.att-card:hover{border-color:#333;background:#1a1a1a}.att-card.duplicate-card{border-color:#ff9800;background:rgba(255,152,0,0.05)}@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}.att-num{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}.att-num.valid{background:rgba(0,230,118,0.15);color:#00e676}.att-num.invalid{background:rgba(255,82,82,0.15);color:#ff5252}.att-info{flex:1;min-width:0}.att-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.att-meta{font-size:11px;color:#666;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.att-time{font-size:11px;color:#555;text-align:right;flex-shrink:0}.att-time .time{color:#888;font-weight:500}.att-badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600}.att-badge.dup{background:rgba(255,152,0,0.15);color:#ff9800}.att-badge.course{background:rgba(68,138,255,0.15);color:#448aff}.att-badge.batch{background:rgba(255,152,0,0.15);color:#ff9800}.empty{text-align:center;padding:60px 20px;color:#444}.empty .icon{font-size:48px;margin-bottom:15px}.empty p{font-size:14px}.btn-export{padding:8px 16px;background:rgba(68,138,255,0.1);border:1px solid #448aff;border-radius:8px;color:#448aff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s}.btn-export:hover{background:#448aff;color:#fff}.sound-toggle{position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;background:#222;border:1px solid #333;color:#888;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:100;transition:all 0.2s}.sound-toggle:hover{background:#333;color:#fff}.sound-toggle.muted{color:#ff5252}.no-batch-warning{color:#ff5252;font-size:12px;text-align:center;margin-top:8px;display:none}.no-batch-warning.show{display:block}@media(max-width:600px){.header{padding:15px}.header h1{font-size:18px}.stat-box{min-width:80px;padding:8px 14px}.stat-box .num{font-size:22px}.batch-section{padding:12px 15px}.batch-row{flex-wrap:wrap}.batch-row label{width:100%}.input-section{padding:15px}.input-row input{font-size:18px;padding:14px 16px;letter-spacing:3px}.list-section{padding:15px}.attendance-grid{grid-template-columns:1fr}}</style></head><body><div class="flash" id="flash"><div id="flashIcon"></div><div id="flashSub" class="sub"></div></div><button class="sound-toggle" id="soundBtn" onclick="toggleSound()" title="Toggle Sound">🔊</button><div class="header"><h1>🎯 Zoom <span>Attendance</span></h1><div class="header-stats"><div class="stat-box green"><div class="num" id="validCount">0</div><div class="lbl">Present</div></div><div class="stat-box red"><div class="num" id="invalidCount">0</div><div class="lbl">Invalid</div></div><div class="stat-box blue"><div class="num" id="dupCount">0</div><div class="lbl">Duplicate</div></div></div></div><div class="batch-section"><div class="batch-row"><label>📦 Batch Name:</label><input type="text" id="batchInput" placeholder="e.g. Zoom Batch 25 Jan Morning" /><button class="batch-lock-btn" id="batchLockBtn" onclick="lockBatch()">🔒 Lock Batch</button></div><div class="no-batch-warning" id="noBatchWarning">⚠️ Please enter & lock a batch name before scanning</div></div><div class="input-section"><div class="input-row"><input type="text" id="scanInput" placeholder="Type or paste 7-char ID..." autocomplete="off" spellcheck="false" disabled /><button class="btn-clear" onclick="clearAll()">🗑 Clear All</button></div><div class="instructions"><div class="inst-chip"><span class="dot"></span> Student shows pass on Zoom</div><div class="inst-chip"><span class="dot"></span> You read & type the ID</div><div class="inst-chip"><span class="dot"></span> Press Enter to verify</div><div class="inst-chip"><span class="dot"></span> Or paste from Zoom chat</div></div></div><div class="list-section"><div class="list-header"><h2>📋 Attendance Log</h2><div style="display:flex;gap:10px;align-items:center;"><input type="text" class="search-box" id="searchBox" placeholder="Search name..." oninput="filterList()" /><button class="btn-export" onclick="exportCSV()">📥 Export CSV</button></div></div><div class="attendance-grid" id="attGrid"><div class="empty" id="emptyState"><div class="icon">📹</div><p>Lock a batch name above to start scanning...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div></div></div><script>var scanInput=document.getElementById('scanInput'),batchInput=document.getElementById('batchInput'),batchLockBtn=document.getElementById('batchLockBtn'),noBatchWarning=document.getElementById('noBatchWarning'),attGrid=document.getElementById('attGrid'),emptyState=document.getElementById('emptyState'),attendanceList=[],scannedIds=new Set(),soundEnabled=true,counter=0,batchLocked=false,currentBatch='';var today=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric'});batchInput.value='Zoom Batch '+today;setInterval(function(){if(document.activeElement!==scanInput&&document.activeElement!==document.getElementById('searchBox')&&document.activeElement!==batchInput)scanInput.focus();},150);var audioCtx=new(window.AudioContext||window.webkitAudioContext)();function playBeep(f,d,t){if(!soundEnabled)return;try{var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.type=t||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.3,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.start();o.stop(audioCtx.currentTime+d);}catch(e){}}function playSuccess(){playBeep(880,0.15);setTimeout(function(){playBeep(1100,0.2);},100);}function playError(){playBeep(300,0.3,'square');}function playDuplicate(){playBeep(600,0.15);setTimeout(function(){playBeep(400,0.2);},120);}function toggleSound(){soundEnabled=!soundEnabled;var b=document.getElementById('soundBtn');b.textContent=soundEnabled?'🔊':'🔇';b.classList.toggle('muted',!soundEnabled);}function showFlash(t,i,s){var f=document.getElementById('flash');document.getElementById('flashIcon').textContent=i;document.getElementById('flashSub').textContent=s||'';f.className='flash '+t+' show';setTimeout(function(){f.className='flash '+t;},1200);}function updateStats(){var v=0,i=0,d=0;for(var x=0;x<attendanceList.length;x++){if(attendanceList[x].valid&&!attendanceList[x].duplicate)v++;else if(attendanceList[x].duplicate)d++;else i++;}document.getElementById('validCount').textContent=v;document.getElementById('invalidCount').textContent=i;document.getElementById('dupCount').textContent=d;}function getKolkataTime(){return new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});}function addCard(e){if(emptyState)emptyState.style.display='none';var c=document.createElement('div');c.className='att-card'+(e.duplicate?' duplicate-card':'');c.dataset.name=(e.name||'').toLowerCase();c.dataset.id=e.id;var bh=e.batch?'<span class="att-badge batch">'+e.batch+'</span>':'';c.innerHTML='<div class="att-num '+(e.valid?'valid':'invalid')+'">'+e.sno+'</div><div class="att-info"><div class="att-name">'+(e.name||'—')+'</div><div class="att-meta"><span>ID: '+e.id+'</span>'+(e.course?'<span class="att-badge course">'+e.course+'</span>':'')+bh+(e.duplicate?'<span class="att-badge dup">DUPLICATE</span>':'')+'</div></div><div class="att-time"><div class="time">'+e.time+'</div></div>';attGrid.insertBefore(c,attGrid.firstChild);}function lockBatch(){var n=batchInput.value.trim();if(!n){noBatchWarning.classList.add('show');batchInput.focus();return;}currentBatch=n;batchLocked=true;batchInput.disabled=true;batchLockBtn.textContent='✅ '+n;batchLockBtn.classList.add('locked');scanInput.disabled=false;noBatchWarning.classList.remove('show');scanInput.focus();}batchInput.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();lockBatch();}});scanInput.addEventListener('keydown',async function(e){if(e.key!=='enter')return;e.preventDefault();if(!batchLocked){noBatchWarning.classList.add('show');return;}var rawId=scanInput.value.trim();scanInput.value='';if(!rawId)return;var id=rawId.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(id.length!==7){playError();showFlash('error','❌','Invalid length ('+id.length+'/7)');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});updateStats();return;}if(scannedIds.has(id)){playDuplicate();showFlash('duplicate','⚠️',id+' — Already Scanned!');counter++;var orig=null;for(var i=0;i<attendanceList.length;i++){if(attendanceList[i].id===id){orig=attendanceList[i];break;}}addCard({sno:counter,id:id,name:orig?orig.name:'—',valid:true,duplicate:true,course:orig?orig.course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:true,batch:currentBatch});updateStats();return;}try{var res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id,batch_name:currentBatch})});var json=await res.json();scannedIds.add(id);counter++;if(json.success){var u=json.data;playSuccess();showFlash('success','✅',u.full_name);addCard({sno:counter,id:id,name:u.full_name,valid:true,duplicate:false,course:u.course_type||'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:false,name:u.full_name,course:u.course_type||'',batch:currentBatch});}else{playError();showFlash('error','❌',json.message||'Not Found');addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}}catch(err){playError();showFlash('error','🌐','Network Error');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}updateStats();});function filterList(){var q=document.getElementById('searchBox').value.toLowerCase();var cards=attGrid.querySelectorAll('.att-card');for(var i=0;i<cards.length;i++){var m=cards[i].dataset.name.indexOf(q)!==-1||cards[i].dataset.id.indexOf(q)!==-1;cards[i].style.display=m?'':'none';}}function clearAll(){if(!confirm('Clear all attendance records?'))return;attendanceList=[];scannedIds.clear();counter=0;attGrid.innerHTML='<div class="empty" id="emptyState"><div class="icon">📹</div><p>Waiting for first scan...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>';updateStats();}function exportCSV(){if(attendanceList.length===0){alert('No records to export');return;}var csv='S.No,ID,Name,Course,Batch,Status,Time\\n';for(var i=0;i<attendanceList.length;i++){var a=attendanceList[i];var s=a.duplicate?'DUPLICATE':(a.valid?'VALID':'INVALID');csv+=(i+1)+','+a.id+',"'+(a.name||'—')+'","'+(a.course||'')+'","'+(a.batch||'')+'",'+s+','+(a.time||'')+'\\n';}var b=new Blob([csv],{type:'text/csv'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=(currentBatch||'attendance').replace(/[^a-zA-Z0-9 ]/g,'').replace(/ +/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(u);}document.addEventListener('paste',function(e){if(document.activeElement===document.getElementById('searchBox'))return;if(!batchLocked)return;var t=(e.clipboardData||window.clipboardData).getData('text');var c=t.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(c.length>=7){scanInput.value=c.slice(0,7);scanInput.focus();if(c.length===7){setTimeout(function(){scanInput.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));},50);}}});</script></body></html>`);
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Zoom Batch Attendance</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0a0a0a;color:#e5e5e5;min-height:100vh}.header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:20px 30px;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px}.header h1{font-size:22px;font-weight:700}.header h1 span{color:#00e676}.header-stats{display:flex;gap:20px;flex-wrap:wrap}.stat-box{background:rgba(255,255,255,0.05);border:1px solid #333;border-radius:12px;padding:10px 20px;text-align:center;min-width:100px}.stat-box .num{font-size:28px;font-weight:800}.stat-box .lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:2px}.stat-box.green .num{color:#00e676}.stat-box.red .num{color:#ff5252}.stat-box.blue .num{color:#448aff}.batch-section{padding:18px 30px;background:#0d0d0d;border-bottom:1px solid #222}.batch-row{display:flex;gap:12px;max-width:700px;margin:0 auto;align-items:center}.batch-row label{font-size:13px;color:#888;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:1px}.batch-row input{flex:1;padding:12px 18px;font-size:15px;background:#1a1a1a;border:2px solid #333;border-radius:10px;color:#fff;outline:none;transition:border-color 0.2s}.batch-row input:focus{border-color:#ff9800;box-shadow:0 0 15px rgba(255,152,0,0.15)}.batch-row input::placeholder{color:#444}.batch-lock-btn{padding:12px 18px;background:rgba(255,152,0,0.1);border:2px solid #ff9800;border-radius:10px;color:#ff9800;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;text-transform:uppercase;letter-spacing:0.5px}.batch-lock-btn:hover{background:#ff9800;color:#000}.batch-lock-btn.locked{background:rgba(0,230,118,0.1);border-color:#00e676;color:#00e676;cursor:default}.input-section{padding:25px 30px;background:#111;border-bottom:1px solid #222}.input-row{display:flex;gap:12px;max-width:700px;margin:0 auto}.input-row input{flex:1;padding:16px 24px;font-size:22px;font-family:'Courier New',monospace;font-weight:700;letter-spacing:4px;text-align:center;text-transform:uppercase;background:#1a1a1a;border:2px solid #333;border-radius:14px;color:#fff;outline:none;transition:border-color 0.2s}.input-row input:focus{border-color:#00e676;box-shadow:0 0 20px rgba(0,230,118,0.15)}.input-row input::placeholder{color:#555;letter-spacing:1px;font-size:16px;font-weight:400}.input-row input:disabled{opacity:0.3;cursor:not-allowed}.btn-clear{padding:16px 24px;background:#2a1a1a;border:2px solid #ff5252;border-radius:14px;color:#ff5252;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap}.btn-clear:hover{background:#ff5252;color:#fff}.instructions{max-width:700px;margin:0 auto;display:flex;gap:20px;margin-top:15px;flex-wrap:wrap;justify-content:center}.inst-chip{background:rgba(255,255,255,0.04);border:1px solid #2a2a2a;border-radius:20px;padding:6px 14px;font-size:12px;color:#888;display:flex;align-items:center;gap:6px}.inst-chip .dot{width:6px;height:6px;border-radius:50%;background:#00e676}.flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);z-index:1000;padding:30px 60px;border-radius:20px;font-size:28px;font-weight:800;text-align:center;pointer-events:none;transition:transform 0.15s ease-out,opacity 0.3s;opacity:0}.flash.show{transform:translate(-50%,-50%) scale(1);opacity:1}.flash.success{background:rgba(0,230,118,0.95);color:#000;box-shadow:0 0 60px rgba(0,230,118,0.5)}.flash.error{background:rgba(255,82,82,0.95);color:#fff;box-shadow:0 0 60px rgba(255,82,82,0.5)}.flash.duplicate{background:rgba(255,193,7,0.95);color:#000;box-shadow:0 0 60px rgba(255,193,7,0.5)}.flash .sub{font-size:14px;font-weight:400;margin-top:5px;opacity:0.8}.list-section{padding:20px 30px}.list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px}.list-header h2{font-size:16px;color:#888;font-weight:500}.search-box{padding:8px 16px;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;outline:none;width:200px}.search-box:focus{border-color:#00e676}.attendance-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}.att-card{background:#151515;border:1px solid #222;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:all 0.2s;animation:slideIn 0.3s ease-out}.att-card:hover{border-color:#333;background:#1a1a1a}.att-card.duplicate-card{border-color:#ff9800;background:rgba(255,152,0,0.05)}@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}.att-num{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}.att-num.valid{background:rgba(0,230,118,0.15);color:#00e676}.att-num.invalid{background:rgba(255,82,82,0.15);color:#ff5252}.att-info{flex:1;min-width:0}.att-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.att-meta{font-size:11px;color:#666;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.att-time{font-size:11px;color:#555;text-align:right;flex-shrink:0}.att-time .time{color:#888;font-weight:500}.att-badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600}.att-badge.dup{background:rgba(255,152,0,0.15);color:#ff9800}.att-badge.course{background:rgba(68,138,255,0.15);color:#448aff}.att-badge.batch{background:rgba(255,152,0,0.15);color:#ff9800}.empty{text-align:center;padding:60px 20px;color:#444}.empty .icon{font-size:48px;margin-bottom:15px}.empty p{font-size:14px}.btn-export{padding:8px 16px;background:rgba(68,138,255,0.1);border:1px solid #448aff;border-radius:8px;color:#448aff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s}.btn-export:hover{background:#448aff;color:#fff}.sound-toggle{position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;background:#222;border:1px solid #333;color:#888;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:100;transition:all 0.2s}.sound-toggle:hover{background:#333;color:#fff}.sound-toggle.muted{color:#ff5252}.no-batch-warning{color:#ff5252;font-size:12px;text-align:center;margin-top:8px;display:none}.no-batch-warning.show{display:block}@media(max-width:600px){.header{padding:15px}.header h1{font-size:18px}.stat-box{min-width:80px;padding:8px 14px}.stat-box .num{font-size:22px}.batch-section{padding:12px 15px}.batch-row{flex-wrap:wrap}.batch-row label{width:100%}.input-section{padding:15px}.input-row input{font-size:18px;padding:14px 16px;letter-spacing:3px}.list-section{padding:15px}.attendance-grid{grid-template-columns:1fr}}</style></head><body><div class="flash" id="flash"><div id="flashIcon"></div><div id="flashSub" class="sub"></div></div><button class="sound-toggle" id="soundBtn" onclick="toggleSound()" title="Toggle Sound">🔊</button><div class="header"><h1>🎯 Zoom <span>Attendance</span></h1><div class="header-stats"><div class="stat-box green"><div class="num" id="validCount">0</div><div class="lbl">Present</div></div><div class="stat-box red"><div class="num" id="invalidCount">0</div><div class="lbl">Invalid</div></div><div class="stat-box blue"><div class="num" id="dupCount">0</div><div class="lbl">Duplicate</div></div></div></div><div class="batch-section"><div class="batch-row"><label>📦 Batch Name:</label><input type="text" id="batchInput" placeholder="e.g. Zoom Batch 25 Jan Morning" /><button class="batch-lock-btn" id="batchLockBtn" onclick="lockBatch()">🔒 Lock Batch</button></div><div class="no-batch-warning" id="noBatchWarning">⚠️ Please enter & lock a batch name before scanning</div></div><div class="input-section"><div class="input-row"><input type="text" id="scanInput" placeholder="Type or paste 7-char ID..." autocomplete="off" spellcheck="false" disabled /><button class="btn-clear" onclick="clearAll()">🗑 Clear All</button></div><div class="instructions"><div class="inst-chip"><span class="dot"></span> Student shows pass on Zoom</div><div class="inst-chip"><span class="dot"></span> You read & type the ID</div><div class="inst-chip"><span class="dot"></span> Press Enter to verify</div><div class="inst-chip"><span class="dot"></span> Or paste from Zoom chat</div></div></div><div class="list-section"><div class="list-header"><h2>📋 Attendance Log</h2><div style="display:flex;gap:10px;align-items:center;"><input type="text" class="search-box" id="searchBox" placeholder="Search name..." oninput="filterList()" /><button class="btn-export" onclick="exportCSV()">📥 Export CSV</button></div></div><div class="attendance-grid" id="attGrid"><div class="empty" id="emptyState"><div class="icon">📹</div><p>Lock a batch name above to start scanning...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div></div></div><script>var scanInput=document.getElementById('scanInput'),batchInput=document.getElementById('batchInput'),batchLockBtn=document.getElementById('batchLockBtn'),noBatchWarning=document.getElementById('noBatchWarning'),attGrid=document.getElementById('attGrid'),emptyState=document.getElementById('emptyState'),attendanceList=[],scannedIds=new Set(),soundEnabled=true,counter=0,batchLocked=false,currentBatch='';var today=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric'});batchInput.value='Zoom Batch '+today;setInterval(function(){if(document.activeElement!==scanInput&&document.activeElement!==document.getElementById('searchBox')&&document.activeElement!==batchInput)scanInput.focus();},150);var audioCtx=new(window.AudioContext||window.webkitAudioContext)();function playBeep(f,d,t){if(!soundEnabled)return;try{var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.type=t||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.3,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.start();o.stop(audioCtx.currentTime+d);}catch(e){}}function playSuccess(){playBeep(880,0.15);setTimeout(function(){playBeep(1100,0.2);},100);}function playError(){playBeep(300,0.3,'square');}function playDuplicate(){playBeep(600,0.15);setTimeout(function(){playBeep(400,0.2);},120);}function toggleSound(){soundEnabled=!soundEnabled;var b=document.getElementById('soundBtn');b.textContent=soundEnabled?'🔊':'🔇';b.classList.toggle('muted',!soundEnabled);}function showFlash(t,i,s){var f=document.getElementById('flash');document.getElementById('flashIcon').textContent=i;document.getElementById('flashSub').textContent=s||'';f.className='flash '+t+' show';setTimeout(function(){f.className='flash '+t;},1200);}function updateStats(){var v=0,i=0,d=0;for(var x=0;x<attendanceList.length;x++){if(attendanceList[x].valid&&!attendanceList[x].duplicate)v++;else if(attendanceList[x].duplicate)d++;else i++;}document.getElementById('validCount').textContent=v;document.getElementById('invalidCount').textContent=i;document.getElementById('dupCount').textContent=d;}function getKolkataTime(){return new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});}function addCard(e){if(emptyState)emptyState.style.display='none';var c=document.createElement('div');c.className='att-card'+(e.duplicate?' duplicate-card':'');c.dataset.name=(e.name||'').toLowerCase();c.dataset.id=e.id;var bh=e.batch?'<span class="att-badge batch">'+e.batch+'</span>':'';c.innerHTML='<div class="att-num '+(e.valid?'valid':'invalid')+'">'+e.sno+'</div><div class="att-info"><div class="att-name">'+(e.name||'—')+'</div><div class="att-meta"><span>ID: '+e.id+'</span>'+(e.course?'<span class="att-badge course">'+e.course+'</span>':'')+bh+(e.duplicate?'<span class="att-badge dup">DUPLICATE</span>':'')+'</div></div><div class="att-time"><div class="time">'+e.time+'</div></div>';attGrid.insertBefore(c,attGrid.firstChild);}function lockBatch(){var n=batchInput.value.trim();if(!n){noBatchWarning.classList.add('show');batchInput.focus();return;}currentBatch=n;batchLocked=true;batchInput.disabled=true;batchLockBtn.textContent='✅ '+n;batchLockBtn.classList.add('locked');scanInput.disabled=false;noBatchWarning.classList.remove('show');scanInput.focus();}batchInput.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();lockBatch();}});scanInput.addEventListener('keydown',async function(e){if(e.key!=='enter')return;e.preventDefault();if(!batchLocked){noBatchWarning.classList.add('show');return;}var rawId=scanInput.value.trim();scanInput.value='';if(!rawId)return;var id=rawId.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(id.length!==7){playError();showFlash('error','❌','Invalid length ('+id.length+'/7)');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});updateStats();return;}if(scannedIds.has(id)){playDuplicate();showFlash('duplicate','⚠️',id+' — Already Scanned!');counter++;var orig=null;for(var i=0;i<attendanceList.length;i++){if(attendanceList[i].id===id){orig=attendanceList[i];break;}}addCard({sno:counter,id:id,name:orig?orig.name:'—',valid:true,duplicate:true,course:orig?orig.course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:true,batch:currentBatch});updateStats();return;}try{var res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({barcode_id:id,batch_name:currentBatch})});var json=await res.json();scannedIds.add(id);counter++;if(json.success){var u=json.data;playSuccess();showFlash('success','✅',u.full_name);addCard({sno:counter,id:id,name:u.full_name,valid:true,duplicate:false,course:u.course_type||'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:true,duplicate:false,name:u.full_name,course:u.course_type||'',batch:currentBatch});}else{playError();showFlash('error','❌',json.message||'Not Found');addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}}catch(err){playError();showFlash('error','🌐','Network Error');counter++;addCard({sno:counter,id:id,name:'—',valid:false,duplicate:false,course:'',batch:currentBatch,time:getKolkataTime()});attendanceList.push({id:id,valid:false,duplicate:false,batch:currentBatch});}updateStats();});function filterList(){var q=document.getElementById('searchBox').value.toLowerCase();var cards=attGrid.querySelectorAll('.att-card');for(var i=0;i<cards.length;i++){var m=cards[i].dataset.name.indexOf(q)!==-1||cards[i].dataset.id.indexOf(q)!==-1;cards[i].style.display=m?'':'none';}}function clearAll(){if(!confirm('Clear all attendance records?'))return;attendanceList=[];scannedIds.clear();counter=0;attGrid.innerHTML='<div class="empty" id="emptyState"><div class="icon">📹</div><p>Waiting for first scan...<br><span style="font-size:12px;color:#333;">Ask students to show their Entry Pass on Zoom</span></p></div>';updateStats();}function exportCSV(){if(attendanceList.length===0){alert('No records to export');return;}var csv='S.No,ID,Name,Course,Batch,Status,Time\\n';for(var i=0;i<attendanceList.length;i++){var a=attendanceList[i];var s=a.duplicate?'DUPLICATE':(a.valid?'VALID':'INVALID');csv+=(i+1)+','+a.id+',"'+(a.name||'—')+'","'+(a.course||'')+'","'+(a.batch||'")+'",'+s+','+(a.time||'')+'\\n';}var b=new Blob([csv],{type:'text/csv'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=(currentBatch||'attendance').replace(/[^a-zA-Z0-9 ]/g,'').replace(/ +/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(u);}document.addEventListener('paste',function(e){if(document.activeElement===document.getElementById('searchBox'))return;if(!batchLocked)return;var t=(e.clipboardData||window.clipboardData).getData('text');var c=t.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(c.length>=7){scanInput.value=c.slice(0,7);scanInput.focus();if(c.length===7){setTimeout(function(){scanInput.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));},50);}}});</script></body></html>`);
 });
 
 // ==================================================================================
 // 🚪 ZOOM GATE - Student enters ID before joining Zoom meeting
 // 🔐 ONE DEVICE LOCK: Each pass can only be used from ONE device
 // Supports: Registration links (?reg=TOKEN) AND Direct join links (?m=ID&pwd=PASS)
+// ✅ FIXED: Auto-login now checks DB device_fingerprint — old device kicked after reset
 // ==================================================================================
 app.get("/join", async (req, res) => {
   const { m, pwd, omn, type, reg } = req.query;
@@ -475,11 +475,9 @@ app.get("/join", async (req, res) => {
   let meetingLabel = '';
 
   if (reg) {
-    // 🔹 Registration-based meeting (e.g. https://us06web.zoom.us/meeting/register/038cejC1R7KLusQii328oA)
     zoomUrl = `https://us06web.zoom.us/meeting/register/${reg}`;
     meetingLabel = 'Registration: ' + reg;
   } else if (m) {
-    // 🔹 Direct join meeting (meeting ID + password)
     zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
     meetingLabel = 'Meeting: ' + m;
   } else {
@@ -488,12 +486,49 @@ app.get("/join", async (req, res) => {
 
   const accessType = type === 'advance' ? 'advance' : 'basic';
 
-  // ✅ AUTO-LOGIN: Check if student session is valid and not expired
+  // ============================================================
+  // ✅ AUTO-LOGIN with DATABASE DEVICE CHECK
+  // Checks: session valid? + DB device_fingerprint still matches?
+  // If admin reset device → DB fingerprint is NULL → kill session
+  // If admin reset & new device bound → DB fingerprint differs → kill session
+  // ============================================================
   if (req.session.studentAccess && req.session.studentAccess.expiresAt > Date.now()) {
-    console.log(`⚡ Auto-login: ${req.session.studentAccess.name} bypassed ID entry.`);
-    return res.redirect(zoomUrl);
+    try {
+      // 🔐 Check DB — is device still bound? Was it reset?
+      const devCheck = await pool.query(
+        "SELECT device_fingerprint, full_name FROM users WHERE id = $1",
+        [req.session.studentAccess.id]
+      );
+
+      if (devCheck.rows.length > 0) {
+        const dbFingerprint = devCheck.rows[0].device_fingerprint;
+        const sessionFingerprint = req.session.studentAccess.device_fingerprint;
+
+        if (dbFingerprint && dbFingerprint === sessionFingerprint) {
+          // ✅ Session device matches DB device — auto-login allowed
+          console.log(`⚡ Auto-login: ${req.session.studentAccess.name} bypassed ID entry.`);
+          return res.redirect(zoomUrl);
+        } else if (dbFingerprint && dbFingerprint !== sessionFingerprint) {
+          // 🚫 DB has a DIFFERENT device bound — this session's device was replaced
+          console.log(`🚫 Session killed: ${req.session.studentAccess.name} - device was reset & rebound to different device`);
+          req.session.studentAccess = null;
+        } else {
+          // 🔓 DB fingerprint is NULL — admin reset the device
+          console.log(`🔓 Session killed: ${req.session.studentAccess.name} - admin reset device binding`);
+          req.session.studentAccess = null;
+        }
+      } else {
+        // User not found — kill session
+        req.session.studentAccess = null;
+      }
+    } catch (err) {
+      console.error("Auto-login DB check error:", err);
+      // On error, destroy session for security
+      req.session.studentAccess = null;
+    }
   }
 
+  // Clear expired/invalid session
   if (req.session.studentAccess) {
     req.session.studentAccess = null;
   }
@@ -587,36 +622,18 @@ app.get("/join", async (req, res) => {
 
     function showMsg(t,h){msgBox.className='msg-box show '+t;msgBox.innerHTML=h;}
 
-    // ============================================================
-    // 🔐 DEVICE FINGERPRINT GENERATOR
-    // Creates a unique ID for this device using hardware + browser signals
-    // ============================================================
     async function generateDeviceFingerprint() {
       try {
         var components = [];
-
-        // 1. User Agent (browser + OS version)
         components.push(navigator.userAgent);
-
-        // 2. Screen properties (resolution, color depth)
         components.push(screen.width + 'x' + screen.height + 'x' + screen.colorDepth);
         components.push(screen.availWidth + 'x' + screen.availHeight);
-
-        // 3. Timezone
-        try {
-          components.push(Intl.DateTimeFormat().resolvedOptions().timeZone);
-        } catch(e) { components.push('tz-unknown'); }
-
-        // 4. Language
+        try { components.push(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch(e) { components.push('tz-unknown'); }
         components.push(navigator.language + '|' + (navigator.languages || []).join(','));
-
-        // 5. Hardware info
         components.push(navigator.platform || '');
         components.push(navigator.hardwareConcurrency || '');
         components.push(navigator.deviceMemory || '');
         components.push(navigator.maxTouchPoints || 0);
-
-        // 6. Canvas fingerprint (very unique to GPU/device)
         try {
           var canvas = document.createElement('canvas');
           canvas.width = 200; canvas.height = 50;
@@ -631,8 +648,6 @@ app.get("/join", async (req, res) => {
           ctx.fillText('TusharBhumkar🔥🔒2024', 4, 17);
           components.push(canvas.toDataURL());
         } catch(e) { components.push('canvas-err'); }
-
-        // 7. WebGL fingerprint (GPU vendor + renderer)
         try {
           var c2 = document.createElement('canvas');
           var gl = c2.getContext('webgl') || c2.getContext('experimental-webgl');
@@ -644,15 +659,9 @@ app.get("/join", async (req, res) => {
             }
           }
         } catch(e) {}
-
-        // 8. Timezone offset
         components.push(new Date().getTimezoneOffset());
-
-        // 9. Cookie / DNT preferences
         components.push(navigator.cookieEnabled);
         components.push(navigator.doNotTrack);
-
-        // Hash all components together (double hash for uniqueness)
         var raw = components.join('|||');
         var hash = 0;
         for (var i = 0; i < raw.length; i++) {
@@ -664,10 +673,8 @@ app.get("/join", async (req, res) => {
         for (var j = 0; j < raw.length; j++) {
           hash2 = ((hash2 << 5) + hash2) + raw.charCodeAt(j);
         }
-        var fingerprint = 'fp_' + Math.abs(hash).toString(36) + '_' + Math.abs(hash2).toString(36) + '_' + raw.length.toString(36);
-        return fingerprint;
+        return 'fp_' + Math.abs(hash).toString(36) + '_' + Math.abs(hash2).toString(36) + '_' + raw.length.toString(36);
       } catch(e) {
-        // Fallback fingerprint
         return 'fp_fallback_' + btoa(navigator.userAgent + screen.width).substring(0, 40);
       }
     }
@@ -675,23 +682,17 @@ app.get("/join", async (req, res) => {
     async function verifyAndJoin() {
       if (verifying) return;
       var id = idInput.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().trim();
-
       if (!id) { showMsg('error','❌ Please enter your Entry Pass ID'); idInput.focus(); return; }
       if (id.length !== 7) {
         showMsg('error','❌ ID must be exactly 7 characters (you entered ' + id.length + ')');
         idInput.focus(); return;
       }
-
       verifying = true;
       joinBtn.disabled = true;
       joinBtn.textContent = 'Verifying...';
       showMsg('loading','<span class="spinner"></span> Verifying device & Entry Pass...');
-
       try {
-        // 🔐 Generate device fingerprint first
         var fingerprint = await generateDeviceFingerprint();
-        console.log('Device fingerprint:', fingerprint);
-
         var res = await fetch('/api/verify-join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -702,9 +703,7 @@ app.get("/join", async (req, res) => {
             device_fingerprint: fingerprint
           })
         });
-
         var json = await res.json();
-
         if (json.success) {
           showMsg('success', '✅ Welcome ' + json.name + '! Redirecting to Zoom...');
           joinBtn.textContent = '✅ Verified — Joining...';
@@ -724,7 +723,6 @@ app.get("/join", async (req, res) => {
         verifying = false;
       }
     }
-
     idInput.focus();
   </script>
 </body>
@@ -748,7 +746,6 @@ app.post("/api/verify-join", async (req, res) => {
       return res.json({ success: false, message: "Could not verify device. Please refresh the page and try again." });
     }
 
-    // ✅ Get user record (now including device_fingerprint)
     const ur = await pool.query(
       "SELECT id, full_name, course_type, device_fingerprint, device_bound_at FROM users WHERE id=$1",
       [barcode_id]
@@ -765,7 +762,6 @@ app.post("/api/verify-join", async (req, res) => {
     // 🔐 DEVICE LOCK CHECK - Core of one-device-per-pass
     // ============================================================
     if (u.device_fingerprint) {
-      // Device already bound — verify it matches
       if (u.device_fingerprint !== device_fingerprint) {
         console.log(`🚫 DEVICE MISMATCH: ${u.full_name} (${barcode_id}) tried from different device. Bound: ${u.device_fingerprint.substring(0,30)}... | Tried: ${device_fingerprint.substring(0,30)}...`);
         return res.json({
@@ -773,10 +769,8 @@ app.post("/api/verify-join", async (req, res) => {
           message: "🔒 This Entry Pass is already locked to another device. Sharing passes is not allowed. If this is your device, please call +91 9156709542."
         });
       }
-      // ✅ Same device — allow
       console.log(`✅ Device match: ${u.full_name} rejoined from same device`);
     } else {
-      // 🆕 First time — bind this device to the pass forever
       await pool.query(
         "UPDATE users SET device_fingerprint=$1, device_bound_at=NOW() WHERE id=$2",
         [device_fingerprint, barcode_id]
@@ -786,11 +780,9 @@ app.post("/api/verify-join", async (req, res) => {
 
     console.log("✅ Zoom join approved:", u.full_name, "| ID:", barcode_id, "| Meeting:", meeting_id);
 
-    // ✅ Set login duration based on link type
     let durationDays = (access_type === 'advance') ? 7 : 3;
     const expiresAt = Date.now() + (durationDays * 24 * 60 * 60 * 1000);
 
-    // Save to session
     req.session.studentAccess = {
       id: u.id,
       name: u.full_name,
@@ -800,7 +792,6 @@ app.post("/api/verify-join", async (req, res) => {
 
     console.log(`🔐 Session locked for ${u.full_name} for ${durationDays} days via ${access_type} link.`);
 
-    // Log the scan
     await pool.query(
       `INSERT INTO scans (barcode_id, course_type, device_info, batch_name, scanned_at)
        VALUES ($1, $2, $3, $4, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))`,
@@ -910,7 +901,6 @@ async function initializeDatabase() {
       END $$;
     `);
 
-    // ✅ NEW: Add device_fingerprint column for one-device lock
     await client.query(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
@@ -920,7 +910,6 @@ async function initializeDatabase() {
       END $$;
     `);
 
-    // ✅ NEW: Add device_bound_at column (when device was first bound)
     await client.query(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
