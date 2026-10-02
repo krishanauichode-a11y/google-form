@@ -481,7 +481,7 @@ app.get("/join", async (req, res) => {
     zoomUrl = `https://us05web.zoom.us/j/${m}${pwd ? '?pwd=' + pwd : ''}${omn ? '&omn=' + omn : ''}`;
     meetingLabel = 'Meeting: ' + m;
   } else {
-    return res.send("❌ Missing meeting info. Share either:<br><br>📍 Registration link:<br>https://google-form-kebh.onrender.com/join?reg=038cejC1R7KLusQii328oA&type=basic<br><br>📍 OR Direct join link:<br>https://google-form-kebh.onrender.com/join?m=9272000111&pwd=UUFgZjAK0l5UVKrAJ5a7AC7YhmbqmS.1&omn=88549659116&type=basic");
+    return res.send("❌ Missing meeting info. Share either:<br><br>📍 Registration link:<br>https://google-form-kebh.onrender.com/join?reg=bS4N7WPFRry9n4Y1GFOV5Q&type=advance<br><br>📍 OR Direct join link:<br>https://google-form-kebh.onrender.com/join?m=9272000111&pwd=UUFgZjAK0l5UVKrAJ5a7AC7YhmbqmS.1&omn=88549659116&type=basic");
   }
 
   const accessType = type === 'advance' ? 'advance' : 'basic';
